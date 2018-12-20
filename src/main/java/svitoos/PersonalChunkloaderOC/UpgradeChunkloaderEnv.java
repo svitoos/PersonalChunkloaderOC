@@ -1,13 +1,17 @@
 package svitoos.PersonalChunkloaderOC;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import java.util.Formatter;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.SetMultimap;
 
+import java.util.stream.Collectors;
 import li.cil.oc.api.Network;
 import li.cil.oc.api.internal.Agent;
 import li.cil.oc.api.machine.Arguments;
@@ -25,15 +29,16 @@ import net.minecraft.util.ChunkCoordinates;
 import net.minecraft.world.ChunkCoordIntPair;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.FakePlayer;
+import sun.security.krb5.internal.Ticket;
 
 public class UpgradeChunkloaderEnv extends ManagedEnvironment {
   private EnvironmentHost host;
 
   private UpgradeChunkloaderTicket ticket = null;
-  private boolean isSuspend = true;
+  private boolean isSuspend;
 
   private static HashSet<UpgradeChunkloaderEnv> chunkloaders = new HashSet<>();
-  private static Map<String, UpgradeChunkloaderTicket> restoredTickets = new HashMap<>();
+  private static Map<String, UpgradeChunkloaderTicket> regTickets = new HashMap<>();
   private static SetMultimap<String, Integer> unloadedDims = HashMultimap.create();
 
   public UpgradeChunkloaderEnv(EnvironmentHost host) {
@@ -77,14 +82,11 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
   @Override
   public void onConnect(Node node) {
     super.onConnect(node);
-    if (node == this.node()) {
-      if (Config.chunkloaderLogLevel > 1) {
-        PersonalChunkloaderOC.info("Connected: %s by %s", this, getOwnerName());
+    if (node == this.node() && !chunkloaders.contains(this)) {
+      if (Config.chunkloaderLogLevel >= 3) {
+        PersonalChunkloaderOC.info("Connected: %", this);
       }
       chunkloaders.add(this);
-      count++;
-      PersonalChunkloaderOC.info("chunkloaders: %d", count);
-
       restoreTicket();
     }
   }
@@ -93,8 +95,8 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
   public void onDisconnect(Node node) {
     super.onDisconnect(node);
     if (node == this.node()) {
-      if (Config.chunkloaderLogLevel > 1) {
-        PersonalChunkloaderOC.info("Disconnected: %s by %s", this, getOwnerName());
+      if (Config.chunkloaderLogLevel >= 3) {
+        PersonalChunkloaderOC.info("Disconnected: %", this);
       }
       chunkloaders.remove(this);
       if (host instanceof Entity
@@ -133,57 +135,116 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
   }
 
   private void restoreTicket() {
-    if (restoredTickets.containsKey(node().address())) {
-      PersonalChunkloaderOC.info("Reclaiming chunk loader ticket for upgrade: %s", this);
-      init(restoredTickets.remove(node().address()));
+    String address = node().address();
+    ticket = UpgradeChunkloaderHandler.pendingTickets.remove(address);
+    if (ticket == null) {
+      ticket = regTickets.get(address);
+    } else {
+      regTickets.put(address, ticket);
+    }
+    if (ticket != null) {
+      if (Config.chunkloaderLogLevel >= 1) {
+        PersonalChunkloaderOC.info("Reclaiming ticket for %s", this);
+      }
+      // check ticket and loader ownerName
+      if (getOwnerName() != null && !getOwnerName().equals(ticket.owner)) {
+        PersonalChunkloaderOC.warn(
+            "owners do not match: %s : loader owned by %s", ticket, getOwnerName());
+        releaseTicket();
+      }
+      if (!allowed()) {
+        releaseTicket();
+      }
+      init();
     }
   }
 
   private void requestTicket() {
-    final int dimensionId = host.world().provider.dimensionId;
-    if (allowedDim(dimensionId) /*&& node.globalBuffer() < Settings.get.chunkloaderCost*/) {
-      final String ownerName = getOwnerName();
-      if (ownerName != null) {
-        if (!(MinecraftServer.getServer().getConfigurationManager().func_152612_a(ownerName)
-            instanceof FakePlayer)) {
-          init(
-              UpgradeChunkloaderTicket.request(
-                  host.world(), getHostCoord(), ownerName, node().address()));
+    if (allowed()) {
+      ticket =
+          UpgradeChunkloaderTicket.request(
+              host.world(), getHostCoord(), getOwnerName(), node().address());
+      if (ticket != null) {
+        regTickets.put(ticket.address, ticket);
+        init();
+        return;
+      } else {
+        if (Config.chunkloaderLogLevel >= 2) {
+          PersonalChunkloaderOC.info("Ticket request failed for %s", this);
         }
       }
     }
   }
 
-  private void init(UpgradeChunkloaderTicket ticket) {
-    this.ticket = ticket;
-    if (ticket != null) {
-      ticket.markChecked();
-      isSuspend =
-          MinecraftServer.getServer().getConfigurationManager().func_152612_a(getOwnerName())
-              == null;
-      PersonalChunkloaderOC.info("isSuspend: %b", isSuspend);
-      // duplicated chunkloaders will not work
-      chunkloaders.forEach(
-          loader -> {
-            if (loader.node().address().equals(node().address()) && loader != this) {
-              loader.releaseTicket();
-            }
-          });
-      if (Config.chunkloaderLogLevel > 0) {
-        PersonalChunkloaderOC.info("Activated: %s", this);
-      }
-      updateLoadedChunks();
+  private void init() {
+    // duplicated chunkloaders will not work
+    chunkloaders.forEach(
+        loader -> {
+          if (loader.node().address().equals(node().address()) && loader != this) {
+            loader.releaseTicket();
+          }
+        });
+    ticket.loader = this;
+    isSuspend =
+        (MinecraftServer.getServer().getConfigurationManager().func_152612_a(getOwnerName())
+            == null);
+    if (Config.chunkloaderLogLevel >= 2) {
+      PersonalChunkloaderOC.info("Activate %s%s", this, isSuspend ? " (suspend)" : "");
     }
+    updateLoadedChunks();
   }
 
   private void releaseTicket() {
     if (ticket != null) {
       ticket.release();
+      regTickets.remove(ticket.address);
       ticket = null;
-      if (Config.chunkloaderLogLevel > 0) {
-        PersonalChunkloaderOC.info("Deactivated: %s", this);
+      if (Config.chunkloaderLogLevel >= 2) {
+        PersonalChunkloaderOC.info("Deactivate %s", this);
       }
     }
+  }
+
+  private boolean allowed() {
+
+    final String ownerName = getOwnerName();
+    if (ownerName == null) {
+      if (Config.chunkloaderLogLevel >= 2) {
+        PersonalChunkloaderOC.info("Activation denied: %s : %s: ", "no owner", this);
+      }
+      return false;
+    }
+
+    if (!UpgradeChunkloaderTicket.ticketAvailableFor(ownerName)) {
+      if (Config.chunkloaderLogLevel >= 2) {
+        PersonalChunkloaderOC.info("Activation denied: %s : %s: ", "ticket limit", this);
+      }
+      return false;
+    }
+
+    if ((MinecraftServer.getServer().getConfigurationManager().func_152612_a(ownerName)
+        instanceof FakePlayer)) {
+      if (Config.chunkloaderLogLevel >= 2) {
+        PersonalChunkloaderOC.info("Activation denied: %s : %s: ", "owner is fake player", this);
+      }
+      return false;
+    }
+
+    final int dimensionId = host.world().provider.dimensionId;
+    if (!allowedDim(dimensionId)) {
+      if (Config.chunkloaderLogLevel >= 2) {
+        PersonalChunkloaderOC.info("Activation denied: %s : %s: ", "blacklisted dimension", this);
+      }
+      return false;
+    }
+
+    if (!allowedCoord(getHostCoord())) {
+      if (Config.chunkloaderLogLevel >= 2) {
+        PersonalChunkloaderOC.info("Activation denied: %s : %s: ", "blacklisted area", this);
+      }
+      return false;
+    }
+    return true;
   }
 
   private void updateLoadedChunks() {
@@ -196,30 +257,27 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
   }
 
   private void awake() {
-    PersonalChunkloaderOC.info("awake: isSuspend = %b", isSuspend);
+    assert ticket != null;
     if (!isSuspend) {
       return;
     }
     isSuspend = false;
-    if (Config.chunkloaderLogLevel > 0) {
-      PersonalChunkloaderOC.info("Awake: %s", this);
+    if (Config.chunkloaderLogLevel >= 2) {
+      PersonalChunkloaderOC.info("Awake %s", this);
     }
-    if (ticket != null) {
-      updateLoadedChunks();
-    }
+    updateLoadedChunks();
   }
 
   private void suspend() {
+    assert ticket != null;
     if (isSuspend) {
       return;
     }
     isSuspend = true;
-    if (Config.chunkloaderLogLevel > 0) {
-      PersonalChunkloaderOC.info("Suspend: %s", this);
+    if (Config.chunkloaderLogLevel >= 2) {
+      PersonalChunkloaderOC.info("Suspend %s", this);
     }
-    if (ticket != null) {
-      updateLoadedChunks();
-    }
+    updateLoadedChunks();
   }
 
   private ChunkCoordIntPair getHostChunkCoord() {
@@ -237,40 +295,18 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
 
   @Override
   public String toString() {
-    // 		val sAddress = s"${node.address}"
-    // val sActive = if (ticket.isDefined) ", active" else ", inactive"
-    // val sSuspend = if (ticket.isDefined && isSuspend) "/suspend" else ""
-    // val sOwner =  if (getOwnerName.isDefined) s", owned by ${getOwnerName.get}" else ""
-    // val sCoord = s", $hostCoord$hostChunkCoord/${host.world.provider.dimensionId}"
-    // s"chunkloader{$sAddress$sActive$sSuspend$sCoord$sOwner}"
     final Formatter f = new Formatter();
-    f.format("chunkloader{%s}", node().address());
+    final String ownerName = getOwnerName();
+    f.format(
+        "chunkloader %s/%s at (%d, %d, %d) in dim %d",
+        this.node().address(),
+        ownerName != null ? ownerName : "none",
+        (int) host.xPosition(),
+        (int) host.yPosition(),
+        (int) host.zPosition(),
+        host.world().provider.dimensionId);
+
     return f.toString();
-  }
-
-  static void loadTicket(UpgradeChunkloaderTicket ticket) {
-    restoredTickets.put(ticket.address, ticket);
-    //   OpenComputers.log.info("[chunkloader] Restoring: $ticket")
-    if (MinecraftServer.getServer().getConfigurationManager().func_152612_a(ticket.owner) != null) {
-      ticket.forceCenterChunk();
-    }
-  }
-
-  static void onWorldSave() {
-    // Any tickets that were not reassigned by the time the world gets saved
-    // again can be considered orphaned, so we release them.
-    // TODO figure out a better event *after* tile entities were restored
-    // but *before* the world is saved, because the tickets are saved first,
-    // so if the save is because the game is being quit the tickets aren't
-    // actually being cleared. This will *usually* not be a problem, but it
-    // has room for improvement.
-    for (UpgradeChunkloaderTicket ticket : restoredTickets.values()) {
-      if (ticket.unchecked()) {
-        PersonalChunkloaderOC.info("Removing orphaned: %s", ticket.address);
-        ticket.release();
-        restoredTickets.remove(ticket.address);
-      }
-    }
   }
 
   static void onRobotMove(UpgradeChunkloaderEnv loader) {
@@ -280,17 +316,37 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
   }
 
   static void onChunkUnload(int dimensionId, ChunkCoordIntPair chunkCoord) {
-    chunkloaders.forEach(
-        loader -> {
-          if (loader.ticket != null
-              && loader.ticket.dimensionId == dimensionId
-              && loader.ticket.getChunkCoord().equals(chunkCoord)) {
-            restoredTickets.put(loader.ticket.address, loader.ticket);
-            //     if (Settings.get.chunkloaderLogLevel > 0)
-            //       OpenComputers.log.info("[chunkloader] Unloading: $loader")
-            loader.ticket = null; // prevent release
-          }
-        });
+    //    chunkloaders.forEach(
+    //        loader -> {
+    //          UpgradeChunkloaderTicket ticket = loader.ticket;
+    //          if (ticket != null
+    //              && ticket.dimensionId == dimensionId
+    //              && ticket.getChunkCoord().equals(chunkCoord)) {
+    //            if (Config.chunkloaderLogLevel >= 3) {
+    //              PersonalChunkloaderOC.info(" Unloading: %s", loader);
+    //            }
+    //            loader.ticket = null; // prevent release ticket
+    //            ticket.loader = null; // detach loader from ticket
+    //          }
+    //        });
+
+    // alternate
+    regTickets
+        .values()
+        .stream()
+        .filter(
+            ticket ->
+                ticket.loader != null
+                    && ticket.dimensionId == dimensionId
+                    && ticket.getChunkCoord().equals(chunkCoord))
+        .forEach(
+            ticket -> {
+              if (Config.chunkloaderLogLevel >= 3) {
+                PersonalChunkloaderOC.info(" Unloading: %s", ticket.loader);
+              }
+              ticket.loader.ticket = null; // prevent release ticket
+              ticket.loader = null; // detach loader from ticket
+            });
   }
 
   static void onWorldLoad(int dimensionId) {
@@ -298,44 +354,43 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
   }
 
   static void onWorldUnload(int dimensionId) {
-    restoredTickets
-        .values()
+    ImmutableList.copyOf(
+            regTickets
+                .values()
+                .stream()
+                .filter(ticket -> ticket.dimensionId == dimensionId)
+                .iterator())
         .forEach(
             ticket -> {
-              if (ticket.dimensionId == dimensionId) {
-                //   OpenComputers.log.info("[chunkloader] Unloading: $ticket")
-                unloadedDims.put(ticket.owner, dimensionId);
+              if (ticket.loader != null) {
+                ticket.loader.ticket = null; // prevent print "Deactivate" message
               }
+              if (Config.chunkloaderLogLevel >= 2) {
+                PersonalChunkloaderOC.info("Ticket was stored: %s", ticket);
+              }
+              unloadedDims.put(ticket.owner, dimensionId);
+              regTickets.remove(ticket.address);
             });
-    restoredTickets.entrySet().removeIf(e -> e.getValue().dimensionId == dimensionId);
   }
 
   static void onPlayerLoggedIn(String playerName) {
-    PersonalChunkloaderOC.info("onPlayerLoggedIn: %s", playerName);
-    // awake chunk loaders
-    chunkloaders.forEach(
-        loader -> {
-          PersonalChunkloaderOC.info(
-              "onPlayerLoggedIn: %s %s %b",
-              loader, loader.getOwnerName(), loader.getOwnerName().equals(playerName));
-          if (playerName.equals(loader.getOwnerName())) {
-            PersonalChunkloaderOC.info("onPlayerLoggedIn: try awake");
-            loader.awake();
-          }
-        });
-    // force unloaded tickets
-    restoredTickets
-        .values()
+    ImmutableList.copyOf(
+            regTickets
+                .values()
+                .stream()
+                .filter(ticket -> playerName.equals(ticket.owner))
+                .iterator())
         .forEach(
             ticket -> {
-              PersonalChunkloaderOC.info("onPlayerLoggedIn: ticket %s", ticket.address);
-              if (playerName.equals(ticket.owner)) {
-                ticket.forceCenterChunk();
+              if (ticket.loader == null) {
+                ticket.forceLoad(); // force chunk for unloaded chunkloaders
+              } else {
+                ticket.loader.awake(); // awake loaded chunkloaders
               }
             });
+
     // load unloaded dimensions
-    unloadedDims
-        .get(playerName)
+    ImmutableSet.copyOf(unloadedDims.get(playerName))
         .forEach(
             dimensionId -> {
               final World world = MinecraftServer.getServer().worldServerForDimension(dimensionId);
@@ -346,14 +401,19 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
   }
 
   static void onPlayerLoggedOut(String playerName) {
-    PersonalChunkloaderOC.info("onPlayerLoggedIn: %s", playerName);
-    // suspend chunk loaders
-    chunkloaders.forEach(
-        loader -> {
-          if (playerName.equals(loader.getOwnerName())) {
-            loader.suspend();
-          }
-        });
+    PersonalChunkloaderOC.info("onPlayerLoggedOut: %s", playerName);
+
+    ImmutableList.copyOf(
+            chunkloaders
+                .stream()
+                .filter(loader -> playerName.equals(loader.getOwnerName()))
+                .iterator())
+        .forEach(
+            loader -> {
+              if (loader.ticket != null) {
+                loader.suspend();
+              }
+            });
   }
 
   static boolean allowedDim(int dim) {

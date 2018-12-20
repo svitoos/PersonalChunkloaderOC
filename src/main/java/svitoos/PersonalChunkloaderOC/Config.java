@@ -9,7 +9,7 @@ class Config {
 
   static boolean chunkloaderUpgradeRecipe = true;
   static int chunkloaderLogLevel = 99;
-
+  static int maxTicketsPerPlayer = 500;
   static void init(File file) {
     configuration = new Configuration(file);
     configuration.load();

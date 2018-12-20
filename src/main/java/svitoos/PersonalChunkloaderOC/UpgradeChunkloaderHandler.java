@@ -1,10 +1,13 @@
 package svitoos.PersonalChunkloaderOC;
 
+import com.google.common.collect.ImmutableSet;
+import java.util.HashMap;
 import java.util.List;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ListMultimap;
 
+import java.util.Map;
 import li.cil.oc.api.event.RobotMoveEvent;
 import li.cil.oc.api.network.Node;
 
@@ -35,18 +38,15 @@ public class UpgradeChunkloaderHandler implements PlayerOrderedLoadingCallback {
                 final int ticketCountAvailable =
                     ForgeChunkManager.ticketCountAvailableFor(playerName);
                 int ticketCount = 0;
-                for (Ticket ticket : playerTickets) {
-                  if (UpgradeChunkloaderTicket.isValid(ticket)
+                for (Ticket fcmTicket : playerTickets) {
+                  if (UpgradeChunkloaderTicket.isValid(fcmTicket)
                       && UpgradeChunkloaderEnv.allowedCoord(
-                          new UpgradeChunkloaderTicket(ticket, world.provider.dimensionId)
-                              .getBlockCoord())) {
+                          new UpgradeChunkloaderTicket(fcmTicket).getBlockCoord())) {
                     ticketCount++;
                     if (ticketCount > ticketCountAvailable) {
                       break;
                     }
-                    PersonalChunkloaderOC.info(
-                        "Validate: %s", ticket.getModData().getString("address"));
-                    loaded.put(ticket.getPlayerName(), ticket);
+                    loaded.put(fcmTicket.getPlayerName(), fcmTicket);
                   }
                 }
               });
@@ -54,18 +54,25 @@ public class UpgradeChunkloaderHandler implements PlayerOrderedLoadingCallback {
     return loaded;
   }
 
-  @Override
-  public void ticketsLoaded(List<Ticket> tickets, World world) {
-    for (Ticket ticket : tickets) {
-      PersonalChunkloaderOC.info("Restoring: %s", ticket.getModData().getString("address"));
-      UpgradeChunkloaderEnv.loadTicket(
-          new UpgradeChunkloaderTicket(ticket, world.provider.dimensionId));
-    }
-  }
+  static Map<String, UpgradeChunkloaderTicket> pendingTickets = new HashMap<>();
 
-  @SubscribeEvent
-  public void onWorldSave(WorldEvent.Save e) {
-    UpgradeChunkloaderEnv.onWorldSave();
+  @Override
+  public void ticketsLoaded(List<Ticket> fcmTickets, World world) {
+    fcmTickets.forEach(
+        fcmTicket -> {
+          UpgradeChunkloaderTicket ticket = new UpgradeChunkloaderTicket(fcmTicket);
+          PersonalChunkloaderOC.info("Restoring %s", ticket);
+          pendingTickets.put(ticket.address, ticket);
+        });
+    ImmutableSet.copyOf(pendingTickets.values()).forEach(UpgradeChunkloaderTicket::forceLoad);
+    pendingTickets
+        .values()
+        .forEach(
+            ticket -> {
+              PersonalChunkloaderOC.warn("A chunkloader ticket has been orphaned! : %s", ticket);
+              ticket.release();
+            });
+    pendingTickets.clear();
   }
 
   @SubscribeEvent

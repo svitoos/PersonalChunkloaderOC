@@ -1,5 +1,8 @@
 package svitoos.PersonalChunkloaderOC;
 
+import java.util.Formatter;
+import java.util.HashMap;
+import java.util.Map;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.ChunkCoordinates;
 import net.minecraft.world.ChunkCoordIntPair;
@@ -9,9 +12,16 @@ import net.minecraftforge.common.ForgeChunkManager;
 
 class UpgradeChunkloaderTicket {
 
+  static Map<String, UpgradeChunkloaderTicket> regTickets = new HashMap<>();
+
   static boolean isValid(ForgeChunkManager.Ticket fcmTicket) {
     NBTTagCompound data = fcmTicket.getModData();
     return data.hasKey("x") && data.hasKey("y") && data.hasKey("z") && data.hasKey("address");
+  }
+
+  static boolean ticketAvailableFor(String username) {
+    return Math.min(Config.maxTicketsPerPlayer, ForgeChunkManager.ticketCountAvailableFor(username))
+        > 0;
   }
 
   private final ForgeChunkManager.Ticket fcmTicket;
@@ -19,14 +29,14 @@ class UpgradeChunkloaderTicket {
   final String owner;
   final int dimensionId;
   private ChunkCoordinates blockCoord;
-  private boolean checked;
+  UpgradeChunkloaderEnv loader;
 
-  UpgradeChunkloaderTicket(ForgeChunkManager.Ticket fcmTicket, int dimensionId) {
+  UpgradeChunkloaderTicket(ForgeChunkManager.Ticket fcmTicket) {
     this.fcmTicket = fcmTicket;
     NBTTagCompound data = fcmTicket.getModData();
     address = data.getString("address");
     owner = fcmTicket.getPlayerName();
-    this.dimensionId = dimensionId;
+    this.dimensionId = fcmTicket.world.provider.dimensionId;
     blockCoord =
         new ChunkCoordinates(data.getInteger("x"), data.getInteger("y"), data.getInteger("z"));
   }
@@ -45,7 +55,7 @@ class UpgradeChunkloaderTicket {
     setBlockCoord(hostCoord);
   }
 
-  public ChunkCoordinates getBlockCoord() {
+  ChunkCoordinates getBlockCoord() {
     return blockCoord;
   }
 
@@ -80,16 +90,13 @@ class UpgradeChunkloaderTicket {
         if (!fcmTicket.getChunkList().contains(chunkCoord)) {
           PersonalChunkloaderOC.info("Force chunk %s by %s", chunkCoord, address);
           ForgeChunkManager.forceChunk(fcmTicket, chunkCoord);
-        } else {
-          PersonalChunkloaderOC.info("Alredy Forced chunk %s by %s", chunkCoord, address);
         }
       }
     }
   }
 
-  void forceCenterChunk() {
-    PersonalChunkloaderOC.info("Force chunk %s by %s", getChunkCoord(), address);
-    ForgeChunkManager.forceChunk(fcmTicket, getChunkCoord());
+  void forceLoad() {
+    fcmTicket.world.getChunkFromBlockCoords(blockCoord.posX, blockCoord.posZ);
   }
 
   void unforceChunks() {
@@ -101,35 +108,29 @@ class UpgradeChunkloaderTicket {
 
   static UpgradeChunkloaderTicket request(
       World world, ChunkCoordinates hostCoord, String playerName, String componentAddress) {
-    if (ForgeChunkManager.ticketCountAvailableFor(playerName) > 0
-        && UpgradeChunkloaderEnv.allowedDim(world.provider.dimensionId)
-        && UpgradeChunkloaderEnv.allowedCoord(hostCoord)) {
-      ForgeChunkManager.Ticket fcmTicket =
-          ForgeChunkManager.requestPlayerTicket(
-              PersonalChunkloaderOC.instance, playerName, world, ForgeChunkManager.Type.NORMAL);
-      if (fcmTicket != null) {
-        PersonalChunkloaderOC.info(
-            "Ticket request is successful: player %s= , address = %s",
-            playerName, componentAddress); // TODO: level debug
-        return new UpgradeChunkloaderTicket(
-            fcmTicket, componentAddress, world.provider.dimensionId, hostCoord);
-      }
+    ForgeChunkManager.Ticket fcmTicket =
+        ForgeChunkManager.requestPlayerTicket(
+            PersonalChunkloaderOC.instance, playerName, world, ForgeChunkManager.Type.NORMAL);
+    if (fcmTicket != null) {
+      return new UpgradeChunkloaderTicket(
+          fcmTicket, componentAddress, world.provider.dimensionId, hostCoord);
     }
-    PersonalChunkloaderOC.info(
-        "Ticket request was rejected: player %s= , address = %s",
-        playerName, componentAddress); // TODO: level debug
     return null;
   }
 
   void release() {
-    ForgeChunkManager.releaseTicket(fcmTicket);
+    try {
+      ForgeChunkManager.releaseTicket(fcmTicket);
+    } catch (Throwable e) {
+      // Ignored.
+    }
   }
 
-  boolean unchecked() {
-    return !checked;
-  }
-
-  void markChecked() {
-    checked = true;
+  public String toString() {
+    final Formatter f = new Formatter();
+    f.format(
+        "ticket %s/%s at (%d, %d, %d) in dim %d",
+        address, owner, blockCoord.posX, blockCoord.posY, blockCoord.posZ, dimensionId);
+    return f.toString();
   }
 }
