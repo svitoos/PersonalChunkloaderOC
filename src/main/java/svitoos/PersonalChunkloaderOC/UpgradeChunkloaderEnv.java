@@ -5,13 +5,11 @@ import com.google.common.collect.ImmutableSet;
 import java.util.Formatter;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.SetMultimap;
 
-import java.util.stream.Collectors;
 import li.cil.oc.api.Network;
 import li.cil.oc.api.internal.Agent;
 import li.cil.oc.api.machine.Arguments;
@@ -29,7 +27,6 @@ import net.minecraft.util.ChunkCoordinates;
 import net.minecraft.world.ChunkCoordIntPair;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.FakePlayer;
-import sun.security.krb5.internal.Ticket;
 
 public class UpgradeChunkloaderEnv extends ManagedEnvironment {
   private EnvironmentHost host;
@@ -62,7 +59,7 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
       return;
     }
     if (host instanceof Entity) { // Robot move events are not fired for entities (drones)
-      updateLoadedChunks();
+      onRobotMove(this);
     }
   }
 
@@ -136,7 +133,7 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
 
   private void restoreTicket() {
     String address = node().address();
-    ticket = UpgradeChunkloaderHandler.pendingTickets.remove(address);
+    ticket = UpgradeChunkloaderHandler.restoredTickets.remove(address);
     if (ticket == null) {
       ticket = regTickets.get(address);
     } else {
@@ -167,7 +164,6 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
       if (ticket != null) {
         regTickets.put(ticket.address, ticket);
         init();
-        return;
       } else {
         if (Config.chunkloaderLogLevel >= 2) {
           PersonalChunkloaderOC.info("Ticket request failed for %s", this);
@@ -310,27 +306,12 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
   }
 
   static void onRobotMove(UpgradeChunkloaderEnv loader) {
-    if (loader.ticket != null) {
+    if (loader.ticket != null && !loader.ticket.getBlockCoord().equals(loader.getHostCoord())) {
       loader.updateLoadedChunks();
     }
   }
 
   static void onChunkUnload(int dimensionId, ChunkCoordIntPair chunkCoord) {
-    //    chunkloaders.forEach(
-    //        loader -> {
-    //          UpgradeChunkloaderTicket ticket = loader.ticket;
-    //          if (ticket != null
-    //              && ticket.dimensionId == dimensionId
-    //              && ticket.getChunkCoord().equals(chunkCoord)) {
-    //            if (Config.chunkloaderLogLevel >= 3) {
-    //              PersonalChunkloaderOC.info(" Unloading: %s", loader);
-    //            }
-    //            loader.ticket = null; // prevent release ticket
-    //            ticket.loader = null; // detach loader from ticket
-    //          }
-    //        });
-
-    // alternate
     regTickets
         .values()
         .stream()

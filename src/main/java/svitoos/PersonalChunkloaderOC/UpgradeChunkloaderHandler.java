@@ -54,7 +54,7 @@ public class UpgradeChunkloaderHandler implements PlayerOrderedLoadingCallback {
     return loaded;
   }
 
-  static Map<String, UpgradeChunkloaderTicket> pendingTickets = new HashMap<>();
+  static Map<String, UpgradeChunkloaderTicket> restoredTickets = new HashMap<>();
 
   @Override
   public void ticketsLoaded(List<Ticket> fcmTickets, World world) {
@@ -62,17 +62,17 @@ public class UpgradeChunkloaderHandler implements PlayerOrderedLoadingCallback {
         fcmTicket -> {
           UpgradeChunkloaderTicket ticket = new UpgradeChunkloaderTicket(fcmTicket);
           PersonalChunkloaderOC.info("Restoring %s", ticket);
-          pendingTickets.put(ticket.address, ticket);
+          restoredTickets.put(ticket.address, ticket);
         });
-    ImmutableSet.copyOf(pendingTickets.values()).forEach(UpgradeChunkloaderTicket::forceLoad);
-    pendingTickets
+    ImmutableSet.copyOf(restoredTickets.values()).forEach(UpgradeChunkloaderTicket::forceLoad);
+    restoredTickets
         .values()
         .forEach(
             ticket -> {
               PersonalChunkloaderOC.warn("A chunkloader ticket has been orphaned! : %s", ticket);
               ticket.release();
             });
-    pendingTickets.clear();
+    restoredTickets.clear();
   }
 
   @SubscribeEvent
