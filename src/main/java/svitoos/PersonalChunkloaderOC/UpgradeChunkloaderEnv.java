@@ -152,7 +152,9 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
       if (!allowed()) {
         releaseTicket();
       }
-      init();
+      if (ticket != null) {
+        init();
+      }
     }
   }
 
