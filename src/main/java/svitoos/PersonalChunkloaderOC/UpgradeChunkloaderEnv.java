@@ -79,11 +79,10 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
   @Override
   public void onConnect(Node node) {
     super.onConnect(node);
-    if (node == this.node() && !chunkloaders.contains(this)) {
+    if (node == this.node() && chunkloaders.add(this)) {
       if (Config.chunkloaderLogLevel >= 3) {
         PersonalChunkloaderOC.info("Connected: %", this);
       }
-      chunkloaders.add(this);
       restoreTicket();
     }
   }
@@ -91,11 +90,10 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
   @Override
   public void onDisconnect(Node node) {
     super.onDisconnect(node);
-    if (node == this.node()) {
+    if (node == this.node() && chunkloaders.remove(this)) {
       if (Config.chunkloaderLogLevel >= 3) {
         PersonalChunkloaderOC.info("Disconnected: %", this);
       }
-      chunkloaders.remove(this);
       if (host instanceof Entity
           && ticket != null) { // request new ticket when drone travel to dimension
         releaseTicket();
