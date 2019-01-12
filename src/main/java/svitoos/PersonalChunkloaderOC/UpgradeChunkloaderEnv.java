@@ -94,20 +94,7 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
       if (Config.chunkloaderLogLevel >= 3) {
         PersonalChunkloaderOC.info("Disconnected: %s", this);
       }
-      if (host instanceof Entity
-          && ticket != null) { // request new ticket when drone travel to dimension
-        releaseTicket();
-        chunkloaders.forEach(
-            loader -> {
-              if (loader.node().address().equals(node.address())
-                  && loader.getOwnerName().equals(getOwnerName())
-                  && loader.ticket == null) {
-                loader.requestTicket();
-              }
-            });
-      } else {
-        releaseTicket();
-      }
+      releaseTicket();
     }
   }
 
