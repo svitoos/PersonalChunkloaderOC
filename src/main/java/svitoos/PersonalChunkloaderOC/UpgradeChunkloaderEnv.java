@@ -31,6 +31,8 @@ import net.minecraftforge.common.util.FakePlayer;
 public class UpgradeChunkloaderEnv extends ManagedEnvironment {
   private EnvironmentHost host;
 
+  private Loader loader;
+
   private UpgradeChunkloaderTicket ticket = null;
   private boolean isSuspend;
 
@@ -83,7 +85,10 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
       if (Config.chunkloaderLogLevel >= 3) {
         PersonalChunkloaderOC.info("Connected: %s", this);
       }
-      restoreTicket();
+      loader = Loader.get(node.address());
+      if (loader.isActive()) {
+        loader.update(getOwnerName(), host.world(), getHostCoord());
+      }
     }
   }
 
@@ -94,7 +99,9 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
       if (Config.chunkloaderLogLevel >= 3) {
         PersonalChunkloaderOC.info("Disconnected: %s", this);
       }
-      releaseTicket();
+      if (loader != null) {
+        loader.delete();
+      }
     }
   }
 
@@ -113,33 +120,6 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
       requestTicket();
     } else if (!enable && ticket != null) {
       releaseTicket();
-    }
-  }
-
-  private void restoreTicket() {
-    String address = node().address();
-    ticket = UpgradeChunkloaderHandler.restoredTickets.remove(address);
-    if (ticket == null) {
-      ticket = regTickets.get(address);
-    } else {
-      regTickets.put(address, ticket);
-    }
-    if (ticket != null) {
-      if (Config.chunkloaderLogLevel >= 1) {
-        PersonalChunkloaderOC.info("Reclaiming ticket for %s", this);
-      }
-      // check ticket and loader ownerName
-      if (getOwnerName() != null && !getOwnerName().equals(ticket.owner)) {
-        PersonalChunkloaderOC.warn(
-            "owners do not match: %s : loader owned by %s", ticket, getOwnerName());
-        releaseTicket();
-      }
-      if (!allowed()) {
-        releaseTicket();
-      }
-      if (ticket != null) {
-        init();
-      }
     }
   }
 
