@@ -13,14 +13,15 @@ import net.minecraftforge.common.ForgeChunkManager.Type;
 class Loader {
   final String address;
   private Ticket ticket;
-  private boolean offline;
+  private boolean active;
   private String ownerName;
   private ChunkCoordinates blockCoord;
   private ChunkCoordIntPair centerChunk;
   private static Map<String, Loader> loaders = new HashMap<>();
 
-  Loader(String address) {
+  Loader(String address, String ownerName,) {
     this.address = address;
+    this.ownerName = ownerName;
     loaders.put(address, this);
   }
 
@@ -31,20 +32,20 @@ class Loader {
     loaders.remove(address);
   }
 
-  static Loader get(String address) {
-    Loader loader = loaders.get(address);
-    if (loader == null) {
-      loader = new Loader(address);
+  static Loader create(String address, String ownerName, World world, ChunkCoordinates blockCoord) {
+    Loader loader = new Loader(address, ownerName);
+    if (loader.requestTicket(world, blockCoord)) {
+      return loader;
     }
-    return loader;
+    return null;
+  }
+
+  static Loader get(String address) {
+    return loaders.get(address);
   }
 
   boolean isActive() {
-    return ticket != null;
-  }
-
-  boolean isOffline() {
-    return offline;
+    return active;
   }
 
   ChunkCoordinates getBlockCoord() {
@@ -77,7 +78,6 @@ class Loader {
   }
 
   void update(String ownerName, World world, ChunkCoordinates blockCoord) {
-    assert isActive();
     if (ownerName == null) {
       return;
     }
