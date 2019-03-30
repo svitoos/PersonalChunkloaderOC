@@ -15,18 +15,22 @@ import net.minecraftforge.common.MinecraftForge;
 
 public class CommonProxy {
 
-  private UpgradeChunkloaderHandler upgradeChunkloaderHandler = new UpgradeChunkloaderHandler();
+  private Loader.Handler chunkloaderHandler = new Loader.Handler();
+  private UpgradeChunkloaderEnv.Handler upgradeEnvHandler = new UpgradeChunkloaderEnv.Handler();
 
   public void preInit(FMLPreInitializationEvent e) {}
 
   public void init(FMLInitializationEvent e) {
     ForgeChunkManager.setForcedChunkLoadingCallback(
-        PersonalChunkloaderOC.instance, upgradeChunkloaderHandler);
-    MinecraftForge.EVENT_BUS.register(upgradeChunkloaderHandler);
-    FMLCommonHandler.instance().bus().register(upgradeChunkloaderHandler);
+        PersonalChunkloaderOC.instance, chunkloaderHandler);
+    MinecraftForge.EVENT_BUS.register(chunkloaderHandler);
+    FMLCommonHandler.instance().bus().register(chunkloaderHandler);
+
+    MinecraftForge.EVENT_BUS.register(upgradeEnvHandler);
 
     PersonalChunkloaderOC.itemChunkloaderUpgrade = new UpgradeChunkloaderItem();
     GameRegistry.registerItem(PersonalChunkloaderOC.itemChunkloaderUpgrade, "chunkloaderUpgrade");
+
     API.driver.add(new UpgradeChunkloaderDriver());
 
     if (Config.chunkloaderUpgradeRecipe) {
