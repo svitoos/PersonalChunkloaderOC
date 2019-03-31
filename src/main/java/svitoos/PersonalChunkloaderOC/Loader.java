@@ -154,12 +154,7 @@ class Loader {
     final Formatter f = new Formatter();
     f.format(
         "chunkloader by %s/%s at (%d, %d, %d) in dim %d",
-        address,
-        ownerName,
-        blockCoord.posX,
-        blockCoord.posY,
-        blockCoord.posZ,
-        dimensionId);
+        address, ownerName, blockCoord.posX, blockCoord.posY, blockCoord.posZ, dimensionId);
 
     return f.toString();
   }

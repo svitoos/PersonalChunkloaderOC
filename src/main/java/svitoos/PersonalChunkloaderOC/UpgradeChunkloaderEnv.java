@@ -64,9 +64,6 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
     return new Object[] {active};
   }
 
-  static int count = 0;
-
-
   @Override
   public void load(NBTTagCompound nbt) {
     super.load(nbt);
