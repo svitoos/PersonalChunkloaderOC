@@ -41,6 +41,12 @@ minecraft {
     replace "/*@MCVERSIONDEP@*/", ", acceptedMinecraftVersions = \"${config.mod.acceptedMinecraftVersions}\""
 }
 
+sourceSets {
+    main {
+        output.resourcesDir = 'build/classes/main'
+    }
+}
+
 repositories {
     mavenCentral()
     maven { url = "http://maven.cil.li/" }
