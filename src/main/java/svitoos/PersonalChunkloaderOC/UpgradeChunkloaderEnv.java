@@ -17,6 +17,7 @@ import li.cil.oc.api.network.Visibility;
 import li.cil.oc.api.prefab.ManagedEnvironment;
 
 import net.minecraft.entity.Entity;
+import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.ChunkCoordinates;
 import net.minecraft.world.ChunkCoordIntPair;
 
@@ -24,6 +25,7 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
   private final EnvironmentHost host;
 
   private Loader loader;
+  private boolean active;
 
   private static final HashSet<UpgradeChunkloaderEnv> upgrades = new HashSet<>();
 
@@ -44,7 +46,7 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
   @Override
   public void update() {
     super.update();
-    if (loader != null && host.world().getTotalWorldTime() % Config.tickFrequency == 0) {
+    if (hasLoader() && host.world().getTotalWorldTime() % Config.tickFrequency == 0) {
       onMove(); // Robot move events are not fired for entities (drones)
     }
   }
@@ -52,17 +54,24 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
   @Callback(doc = "function(enable:boolean):boolean -- Enables or disables the chunkloader.")
   public Object[] setActive(@SuppressWarnings("unused") Context context, Arguments arguments) {
     setActive(arguments.checkBoolean(0));
-    return new Object[] {loader != null};
+    return new Object[] {active};
   }
 
   @Callback(doc = "function():boolean -- Gets whether the chunkloader is currently active.")
   public Object[] isActive(
       @SuppressWarnings("unused") Context context,
       @SuppressWarnings("unused") Arguments arguments) {
-    return new Object[] {loader != null};
+    return new Object[] {active};
   }
 
   static int count = 0;
+
+
+  @Override
+  public void load(NBTTagCompound nbt) {
+    super.load(nbt);
+    active = nbt.hasKey("active");
+  }
 
   @Override
   public void onConnect(Node node) {
@@ -71,7 +80,10 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
       if (Config.chunkloaderLogLevel >= 3) {
         PersonalChunkloaderOC.info("Connected: %s", this);
       }
-      loader = Loader.restore(node().address(), getOwnerName(), host.world(), getHostCoord());
+      if (active) {
+        loader = Loader.restore(node().address(), getOwnerName(), host.world(), getHostCoord());
+        active = hasLoader();
+      }
     }
   }
 
@@ -82,9 +94,19 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
       if (Config.chunkloaderLogLevel >= 3) {
         PersonalChunkloaderOC.info("Disconnected: %s", this);
       }
-      if (loader != null && loader.connected) {
-        loader.delete();
+      if (hasLoader()) {
+        deleteLoader();
       }
+    }
+  }
+
+  @Override
+  public void save(NBTTagCompound nbt) {
+    super.save(nbt);
+    if (active) {
+      nbt.setBoolean("active", true);
+    } else if (nbt.hasKey("active")) {
+      nbt.removeTag("active");
     }
   }
 
@@ -100,11 +122,21 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
 
   private void setActive(boolean enable) {
     if (enable && loader == null) {
-      loader = Loader.create(node().address(), getOwnerName(), host.world(), getHostCoord());
+      createLoader();
     } else if (!enable && loader != null) {
-      loader.delete();
-      loader = null;
+      deleteLoader();
     }
+  }
+
+  private void createLoader() {
+    loader = Loader.create(node().address(), getOwnerName(), host.world(), getHostCoord());
+    active = hasLoader();
+  }
+
+  private void deleteLoader() {
+    loader.delete();
+    loader = null;
+    active = false;
   }
 
   private ChunkCoordIntPair getHostChunkCoord() {
@@ -116,6 +148,10 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
         (int) host.xPosition(), (int) host.yPosition(), (int) host.zPosition());
   }
 
+  private boolean hasLoader() {
+    return loader != null && loader.connected;
+  }
+
   private String getOwnerName() {
     return ((Agent) host).ownerName();
   }
@@ -124,20 +160,21 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
   public String toString() {
     final Formatter f = new Formatter();
     final String ownerName = getOwnerName();
+    final Node node = this.node();
     f.format(
-        "upgrade %s/%s at (%d, %d, %d) in dim %d",
-        this.node().address(),
+        "upgrade %s/%s at (%d, %d, %d) in dim %d %s",
+        node != null ? this.node().address() : "?",
         ownerName != null ? ownerName : "none",
         (int) host.xPosition(),
         (int) host.yPosition(),
         (int) host.zPosition(),
-        host.world().provider.dimensionId);
-
+        host.world().provider.dimensionId,
+        active ? "(active)" : "");
     return f.toString();
   }
 
   private void onMove() {
-    if (loader != null) {
+    if (hasLoader()) {
       loader.update(getHostCoord());
     }
   }

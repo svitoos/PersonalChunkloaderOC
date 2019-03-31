@@ -78,6 +78,7 @@ class Loader {
     if (loaders.remove(address) != null) {
       ForgeChunkManager.releaseTicket(ticket);
       ticket = null;
+      connected = false;
       if (Config.chunkloaderLogLevel >= 2) {
         PersonalChunkloaderOC.info("Removed: %s", this);
       }
@@ -188,21 +189,27 @@ class Loader {
   static Loader restore(
       String address, String ownerName, World world, ChunkCoordinates blockCoord) {
     Loader loader = loaders.get(address);
-    if (loader != null && !loader.connected) {
-      if (loader.ownerName.equals(ownerName)
-          && loader.ticket.world == world
-          && allowed(ownerName, world, blockCoord)) {
-        loader.connected = true;
-        loader.setCoordinates(blockCoord);
-        if (Config.chunkloaderLogLevel >= 2) {
-          PersonalChunkloaderOC.info("Restored: %s", loader);
+    if (loader != null) {
+      if (!loader.connected) {
+        if (loader.ownerName.equals(ownerName)
+            && loader.ticket.world == world
+            && allowed(ownerName, world, blockCoord)) {
+          loader.connected = true;
+          loader.setCoordinates(blockCoord);
+          if (Config.chunkloaderLogLevel >= 2) {
+            PersonalChunkloaderOC.info("Restored: %s", loader);
+          }
+          if (loader.active) {
+            loader.updateChunks();
+          }
+          return loader;
         }
-        if (loader.active) {
-          loader.updateChunks();
-        }
-        return loader;
+        loader.delete();
+      } else {
+        final String oldOwnerName = loader.ownerName;
+        loader.delete();
+        return Loader.create(address, oldOwnerName, world, blockCoord);
       }
-      loader.delete();
     }
     return null;
   }
