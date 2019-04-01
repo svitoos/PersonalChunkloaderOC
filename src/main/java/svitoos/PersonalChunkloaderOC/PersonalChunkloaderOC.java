@@ -15,9 +15,9 @@ import cpw.mods.fml.common.event.FMLPreInitializationEvent;
     version = PersonalChunkloaderOC.VERSION /*@MCVERSIONDEP@*/)
 public class PersonalChunkloaderOC {
 
-  public static final String MOD_ID = "@MODID@";
-  public static final String MOD_NAME = "@MODNAME@";
-  public static final String VERSION = "@MODVERSION@";
+  static final String MOD_ID = "@MODID@";
+  static final String MOD_NAME = "@MODNAME@";
+  static final String VERSION = "@MODVERSION@";
 
   @Mod.Instance public static PersonalChunkloaderOC instance;
 

@@ -9,7 +9,6 @@ import com.google.common.collect.SetMultimap;
 import cpw.mods.fml.common.eventhandler.EventPriority;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.PlayerEvent;
-import java.util.ArrayList;
 import java.util.Formatter;
 import java.util.HashMap;
 import java.util.List;
@@ -28,11 +27,10 @@ import net.minecraftforge.common.util.FakePlayer;
 import net.minecraftforge.event.world.ChunkEvent;
 import net.minecraftforge.event.world.WorldEvent;
 
-class Loader {
+public class Loader {
 
-  private static SetMultimap<String, Integer> unloadedDims = HashMultimap.create();
   private static Map<String, Loader> loaders = new HashMap<>();
-  private static List<Loader> unloadedLoaders = new ArrayList<>();
+  private static SetMultimap<String, Integer> unloadedDims = HashMultimap.create();
 
   final String address;
   final String ownerName;
@@ -41,7 +39,13 @@ class Loader {
   private boolean active;
   private ChunkCoordinates blockCoord;
   private ChunkCoordIntPair centerChunk;
-  boolean connected;
+  private State state = State.Pending;
+
+  public enum State {
+    Connected,
+    Pending,
+    Unloaded
+  }
 
   private Loader(Ticket ticket, String address, ChunkCoordinates blockCoord) {
     assert !loaders.containsKey(address);
@@ -74,33 +78,90 @@ class Loader {
     return true;
   }
 
-  void delete() {
+  public void delete() {
     if (loaders.remove(address) != null) {
       ForgeChunkManager.releaseTicket(ticket);
       ticket = null;
-      connected = false;
+      state = State.Unloaded;
       if (Config.chunkloaderLogLevel >= 2) {
         PersonalChunkloaderOC.info("Removed: %s", this);
       }
     }
   }
 
-  boolean isActive() {
+  public boolean restore(String ownerName, World world, ChunkCoordinates blockCoord) {
+    assert state == State.Pending;
+    if (this.ownerName.equals(ownerName)
+        && ticket.world == world
+        && allowed(ownerName, world, blockCoord)) {
+      state = State.Connected;
+      setCoordinates(blockCoord);
+      if (Config.chunkloaderLogLevel >= 2) {
+        PersonalChunkloaderOC.info("Restored: %s", this);
+      }
+      if (active) {
+        updateChunks();
+      }
+      return true;
+    }
+    delete();
+    return false;
+  }
+
+  public boolean isConnected() {
+    return state == State.Connected;
+  }
+
+  public boolean isActive() {
     return active;
   }
 
-  ChunkCoordinates getBlockCoord() {
+  public State getState() {
+    return state;
+  }
+
+  public ChunkCoordinates getBlockCoord() {
     return blockCoord;
   }
 
-  ChunkCoordIntPair getChunkCoord() {
+  public ChunkCoordIntPair getChunkCoord() {
     return centerChunk;
   }
 
-  void update(ChunkCoordinates blockCoord) {
-    if (setCoordinates(blockCoord) && active) {
-      updateChunks();
+  public boolean update(ChunkCoordinates blockCoord) {
+    if (allowedCoord(dimensionId, blockCoord)) {
+      if (setCoordinates(blockCoord) && active) {
+        updateChunks();
+      }
+      return true;
+    } else {
+      delete();
+      return false;
     }
+  }
+
+  public void activate() {
+    if (!active) {
+      active = true;
+      if (state == State.Connected) {
+        updateChunks(); // включаем подгрузку чанков loader'ом
+      } else if (state == State.Pending) {
+        force(); // подгружаем выгруженный чанк с loader'ом
+      }
+    }
+  }
+
+  public void deactivate() {
+    if (active) {
+      active = false;
+      unforceChunks();
+    }
+  }
+
+  private void unload() {
+    state = State.Unloaded;
+    ticket = null;
+    unloadedDims.put(ownerName, dimensionId);
   }
 
   private void updateChunks() {
@@ -159,7 +220,23 @@ class Loader {
     return f.toString();
   }
 
-  static Loader create(String address, String ownerName, World world, ChunkCoordinates blockCoord) {
+  public static List<Loader> getLoaders() {
+    return ImmutableList.copyOf(loaders.values());
+  }
+
+  public static Loader getPendingLoader(String address) {
+    Loader loader = loaders.get(address);
+    if (loader.state == State.Pending) {
+      return loader;
+    }
+    return null;
+  }
+
+  public static Loader get(String address) {
+    return loaders.get(address);
+  }
+
+  public static Loader create(String address, String ownerName, World world, ChunkCoordinates blockCoord) {
     if (loaders.containsKey(address) || !allowed(ownerName, world, blockCoord)) {
       return null;
     }
@@ -171,7 +248,7 @@ class Loader {
     }
     Loader loader = new Loader(ticket, address, blockCoord);
     ticket.getModData().setString("address", address);
-    loader.connected = true;
+    loader.state = State.Connected;
     if (Config.chunkloaderLogLevel >= 2) {
       PersonalChunkloaderOC.info("Added: %s", loader);
     }
@@ -181,35 +258,7 @@ class Loader {
     return loader;
   }
 
-  static Loader restore(
-      String address, String ownerName, World world, ChunkCoordinates blockCoord) {
-    Loader loader = loaders.get(address);
-    if (loader != null) {
-      if (!loader.connected) {
-        if (loader.ownerName.equals(ownerName)
-            && loader.ticket.world == world
-            && allowed(ownerName, world, blockCoord)) {
-          loader.connected = true;
-          loader.setCoordinates(blockCoord);
-          if (Config.chunkloaderLogLevel >= 2) {
-            PersonalChunkloaderOC.info("Restored: %s", loader);
-          }
-          if (loader.active) {
-            loader.updateChunks();
-          }
-          return loader;
-        }
-        loader.delete();
-      } else {
-        final String oldOwnerName = loader.ownerName;
-        loader.delete();
-        return Loader.create(address, oldOwnerName, world, blockCoord);
-      }
-    }
-    return null;
-  }
-
-  private static boolean allowed(String ownerName, World world, ChunkCoordinates blockCoord) {
+  public static boolean allowed(String ownerName, World world, ChunkCoordinates blockCoord) {
     if (ownerName == null) {
       return false;
     }
@@ -236,11 +285,11 @@ class Loader {
     return true;
   }
 
-  private static boolean allowedDim(int dimensionId) {
+  public static boolean allowedDim(int dimensionId) {
     return true;
   }
 
-  private static boolean allowedCoord(int dimensionId, ChunkCoordinates blockCoord) {
+  public static boolean allowedCoord(int dimensionId, ChunkCoordinates blockCoord) {
     return true;
   }
 
@@ -249,13 +298,12 @@ class Loader {
   }
 
   public static class Handler implements PlayerOrderedLoadingCallback {
+
     @Override
     public ListMultimap<String, Ticket> playerTicketsLoaded(
         ListMultimap<String, Ticket> tickets, World world) {
 
       ListMultimap<String, Ticket> loaded = ArrayListMultimap.create();
-
-      ListMultimap<String, Ticket> valid = ArrayListMultimap.create();
 
       if (allowedDim(world.provider.dimensionId)) {
         tickets
@@ -297,156 +345,127 @@ class Loader {
 
     @Override
     public void ticketsLoaded(List<Ticket> tickets, World world) {
-      tickets.forEach(
-          ticket -> {
-            NBTTagCompound data = ticket.getModData();
-            String address = data.getString("address");
-            if (loaders.containsKey(address)) {
-              PersonalChunkloaderOC.warn("Remove duplicate ticket %s", address);
-              ForgeChunkManager.releaseTicket(ticket);
-            } else {
-              Loader loader =
-                  new Loader(
-                      ticket,
-                      address,
-                      new ChunkCoordinates(
-                          data.getInteger("x"), data.getInteger("y"), data.getInteger("z")));
-              if (Config.chunkloaderLogLevel >= 1) {
-                PersonalChunkloaderOC.info("Loaded: %s", loader);
-              }
-            }
-          });
-    }
-
-    @SuppressWarnings("unused")
-    @SubscribeEvent(priority = EventPriority.HIGH) // after ForgeChunkManager
-    public void onWorldLoad(WorldEvent.Load e) {
-      int dimensionId = e.world.provider.dimensionId;
-      unloadedDims.entries().removeIf(entry -> entry.getValue() == dimensionId);
-      unloadedLoaders.removeIf(loader -> loader.dimensionId == dimensionId);
-      ImmutableList.copyOf(
-              loaders
-                  .values()
-                  .stream()
-                  .filter(loader -> loader.dimensionId == dimensionId && loader.active)
-                  .iterator())
-          .forEach(Loader::force);
-    }
-
-    @SuppressWarnings("unused")
-    @SubscribeEvent(
-        priority =
-            EventPriority
-                .HIGH) // after ForgeChunkManager, before UpgradeChunkloaderEnv.onDisconnect
-    public void onWorldUnload(WorldEvent.Unload e) {
-      int dimensionId = e.world.provider.dimensionId;
+      int dimensionId = world.provider.dimensionId;
+      // удаление старых записей о loader'ах в этом измерении
       ImmutableList.copyOf(
               loaders
                   .values()
                   .stream()
                   .filter(loader -> loader.dimensionId == dimensionId)
                   .iterator())
-          .forEach(
-              loader -> {
-                if (Config.chunkloaderLogLevel >= 1) {
-                  PersonalChunkloaderOC.info("Stored: %s", loader);
-                }
-                unloadedDims.put(loader.ownerName, dimensionId);
-                loaders.remove(loader.address);
-                unloadedLoaders.add(loader);
-              });
+          .forEach(Loader::delete);
+      // создание loader'ов
+      for (Ticket ticket : tickets) {
+        NBTTagCompound data = ticket.getModData();
+        String address = data.getString("address");
+        if (loaders.containsKey(address)) {
+          PersonalChunkloaderOC.warn("Remove duplicate ticket %s", address);
+          ForgeChunkManager.releaseTicket(ticket);
+        } else {
+          Loader loader =
+              new Loader(
+                  ticket,
+                  address,
+                  new ChunkCoordinates(
+                      data.getInteger("x"), data.getInteger("y"), data.getInteger("z")));
+          if (Config.chunkloaderLogLevel >= 1) {
+            PersonalChunkloaderOC.info("Loaded: %s", loader);
+          }
+        }
+      }
     }
 
-    @SuppressWarnings("unused")
+    @SubscribeEvent(priority = EventPriority.HIGH) // after ForgeChunkManager
+    public void onWorldLoad(WorldEvent.Load e) {
+      int dimensionId = e.world.provider.dimensionId;
+      // подгружаем чанки с активными loader'ами
+      for (Loader loader : getLoaders()) {
+        if (loader.dimensionId == dimensionId && loader.active) {
+          loader.force();
+        }
+      }
+    }
+
+    @SubscribeEvent(
+        priority =
+            EventPriority
+                .HIGH) // after ForgeChunkManager, before UpgradeChunkloaderEnv.onDisconnect
+    public void onWorldUnload(WorldEvent.Unload e) {
+      int dimensionId = e.world.provider.dimensionId;
+      // помечаем loader'ы как выгруженные, но не удаляем их
+      for (Loader loader : getLoaders()) {
+        if (loader.dimensionId == dimensionId) {
+          if (Config.chunkloaderLogLevel >= 1) {
+            PersonalChunkloaderOC.info("Stored: %s", loader);
+          }
+          loader.unload();
+        }
+      }
+    }
+
     @SubscribeEvent(priority = EventPriority.LOWEST) // after UpgradeChunkloaderEnv.onConnect
     public void onChunkLoad(ChunkEvent.Load e) {
       int dimensionId = e.getChunk().worldObj.provider.dimensionId;
       ChunkCoordIntPair chunkCoord = e.getChunk().getChunkCoordIntPair();
-      ImmutableList.copyOf(
-              loaders
-                  .values()
-                  .stream()
-                  .filter(
-                      loader ->
-                          loader.dimensionId == dimensionId
-                              && chunkCoord.equals(loader.centerChunk)
-                              && !loader.connected)
-                  .iterator())
-          .forEach(
-              loader -> {
-                PersonalChunkloaderOC.warn("Invalid: %s", loader);
-                loader.delete();
-              });
+      // удаляем "осиротевшие" loader'ы из этого чанка (невосстановленные в методе
+      // UpgradeChunkloaderEnv.onConnect)
+      for (Loader loader : getLoaders()) {
+        if (loader.dimensionId == dimensionId
+            && chunkCoord.equals(loader.centerChunk)
+            && !loader.isConnected()) {
+          PersonalChunkloaderOC.warn("Invalid: %s", loader);
+          loader.delete();
+        }
+      }
     }
 
-    @SuppressWarnings("unused")
     @SubscribeEvent(priority = EventPriority.HIGHEST) // before UpgradeChunkloaderEnv.onDisconnect
     public void onChunkUnload(ChunkEvent.Unload e) {
       int dimensionId = e.getChunk().worldObj.provider.dimensionId;
       ChunkCoordIntPair chunkCoord = e.getChunk().getChunkCoordIntPair();
-      ImmutableList.copyOf(
-              loaders
-                  .values()
-                  .stream()
-                  .filter(
-                      loader ->
-                          loader.dimensionId == dimensionId
-                              && chunkCoord.equals(loader.centerChunk))
-                  .iterator())
-          .forEach(loader -> loader.connected = false);
+      // меняем статус loader'ов в чанке на Pending
+      // для предотвращения их удаления в методе UpgradeChunkloaderEnv.onDisconnect
+      for (Loader loader : getLoaders()) {
+        if (loader.dimensionId == dimensionId
+            && chunkCoord.equals(loader.centerChunk)
+            && !loader.isConnected()) {
+          loader.state = State.Pending;
+        }
+      }
     }
 
-    @SuppressWarnings("unused")
     @SubscribeEvent
     public void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent e) {
       String playerName = e.player.getCommandSenderName();
-
-      ImmutableList.copyOf(
-              loaders
-                  .values()
-                  .stream()
-                  .filter(loader -> playerName.equals(loader.ownerName))
-                  .iterator())
-          .forEach(
-              loader -> {
-                loader.active = true;
-                if (!loader.connected) {
-                  loader.force(); // force chunk for unloaded chunkloaders
-                } else {
-                  loader.updateChunks();
-                }
-              });
-
-      // load unloaded dimensions
-      ImmutableSet.copyOf(Loader.unloadedDims.get(playerName))
-          .forEach(
-              dimensionId -> {
-                final World world =
-                    MinecraftServer.getServer().worldServerForDimension(dimensionId);
-                if (world == null) {
-                  PersonalChunkloaderOC.warn("Could not load dimension %d", dimensionId);
-                }
-              });
+      // активируем все loader'ы игрока в загруженных измерениях
+      for (Loader loader : getLoaders()) {
+        if (playerName.equals(loader.ownerName)) {
+          loader.activate();
+        }
+      }
+      // подгружаем все непрогруженные измерения в которых у игрока есть loader'ы
+      for (Integer dimensionId : ImmutableSet.copyOf(unloadedDims.get(playerName))) {
+        final World world = MinecraftServer.getServer().worldServerForDimension(dimensionId);
+        if (world == null) {
+          PersonalChunkloaderOC.warn("Could not load dimension %d", dimensionId);
+        }
+      }
     }
 
-    @SuppressWarnings("unused")
     @SubscribeEvent
     public void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent e) {
       String playerName = e.player.getCommandSenderName();
+      // деактивируем все loader'ы игрока в загруженных измерениях
+      for (Loader loader : getLoaders()) {
+        if (playerName.equals(loader.ownerName)) {
+          loader.deactivate();
+        }
+      }
+    }
 
-      ImmutableList.copyOf(
-              loaders
-                  .values()
-                  .stream()
-                  .filter(loader -> playerName.equals(loader.ownerName))
-                  .iterator())
-          .forEach(
-              loader -> {
-                if (loader.active) {
-                  loader.active = false;
-                  loader.unforceChunks();
-                }
-              });
+    private static List<Loader> getLoaders() {
+      return ImmutableList.copyOf(
+          loaders.values().stream().filter(loader -> loader.state != State.Unloaded).iterator());
     }
   }
 }

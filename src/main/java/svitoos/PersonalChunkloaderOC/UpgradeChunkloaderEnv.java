@@ -2,8 +2,10 @@ package svitoos.PersonalChunkloaderOC;
 
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import java.util.Formatter;
+import java.util.HashMap;
 import java.util.HashSet;
 
+import java.util.Map;
 import li.cil.oc.api.Network;
 import li.cil.oc.api.event.RobotMoveEvent;
 import li.cil.oc.api.internal.Agent;
@@ -19,7 +21,6 @@ import li.cil.oc.api.prefab.ManagedEnvironment;
 import net.minecraft.entity.Entity;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.ChunkCoordinates;
-import net.minecraft.world.ChunkCoordIntPair;
 
 public class UpgradeChunkloaderEnv extends ManagedEnvironment {
   private final EnvironmentHost host;
@@ -28,6 +29,7 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
   private boolean active;
 
   private static final HashSet<UpgradeChunkloaderEnv> upgrades = new HashSet<>();
+  private static final Map<String, UpgradeChunkloaderEnv> activeUpgrades = new HashMap<>();
 
   public UpgradeChunkloaderEnv(EnvironmentHost host) {
     this.host = host;
@@ -52,15 +54,13 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
   }
 
   @Callback(doc = "function(enable:boolean):boolean -- Enables or disables the chunkloader.")
-  public Object[] setActive(@SuppressWarnings("unused") Context context, Arguments arguments) {
+  public Object[] setActive(Context context, Arguments arguments) {
     setActive(arguments.checkBoolean(0));
     return new Object[] {active};
   }
 
   @Callback(doc = "function():boolean -- Gets whether the chunkloader is currently active.")
-  public Object[] isActive(
-      @SuppressWarnings("unused") Context context,
-      @SuppressWarnings("unused") Arguments arguments) {
+  public Object[] isActive(Context context, Arguments arguments) {
     return new Object[] {active};
   }
 
@@ -78,8 +78,18 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
         PersonalChunkloaderOC.info("Connected: %s", this);
       }
       if (active) {
-        loader = Loader.restore(node().address(), getOwnerName(), host.world(), getHostCoord());
-        active = hasLoader();
+        loader = Loader.getPendingLoader(node.address());
+        if (loader != null) {
+          if (!loader.restore(getOwnerName(), host.world(), getHostCoord())) {
+            deleteLoader();
+          }
+        } else {
+          UpgradeChunkloaderEnv old = activeUpgrades.get(node.address());
+          if (old.hasLoader()) {
+            old.deleteLoader();
+          }
+          createLoader(old.getOwnerName());
+        }
       }
     }
   }
@@ -91,7 +101,7 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
       if (Config.chunkloaderLogLevel >= 3) {
         PersonalChunkloaderOC.info("Disconnected: %s", this);
       }
-      if (hasLoader()) {
+      if (hasLoader() && loader.isConnected()) {
         deleteLoader();
       }
     }
@@ -126,18 +136,28 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
   }
 
   private void createLoader() {
-    loader = Loader.create(node().address(), getOwnerName(), host.world(), getHostCoord());
+    assert !hasLoader();
+    createLoader(getOwnerName());
+  }
+
+  private void createLoader(String ownerName) {
+    assert !hasLoader();
+    if (activeUpgrades.containsKey(node().address())) {
+      return;
+    }
+    loader = Loader.create(node().address(), ownerName, host.world(), getHostCoord());
+    if (hasLoader()) {
+      activeUpgrades.put(node().address(), this);
+    }
     active = hasLoader();
   }
 
   private void deleteLoader() {
+    assert hasLoader();
     loader.delete();
     loader = null;
+    activeUpgrades.remove(node().address());
     active = false;
-  }
-
-  private ChunkCoordIntPair getHostChunkCoord() {
-    return new ChunkCoordIntPair((int) host.xPosition() >> 4, (int) host.zPosition() >> 4);
   }
 
   private ChunkCoordinates getHostCoord() {
@@ -146,7 +166,7 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
   }
 
   private boolean hasLoader() {
-    return loader != null && loader.connected;
+    return loader != null;
   }
 
   private String getOwnerName() {
@@ -171,13 +191,14 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
   }
 
   private void onMove() {
-    if (hasLoader()) {
-      loader.update(getHostCoord());
+    if (hasLoader() && loader.isConnected()) {
+      if (!loader.update(getHostCoord())) {
+        deleteLoader();
+      }
     }
   }
 
   public static class Handler {
-    @SuppressWarnings("unused")
     @SubscribeEvent
     public void onRobotMove(RobotMoveEvent.Post e) {
       final Node machineNode = e.agent.machine().node();
