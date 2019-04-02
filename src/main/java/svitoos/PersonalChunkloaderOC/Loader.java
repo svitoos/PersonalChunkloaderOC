@@ -92,12 +92,12 @@ public class Loader {
 
   public void delete() {
     if (loaders.remove(address) != null) {
-      ForgeChunkManager.releaseTicket(ticket);
-      ticket = null;
-      state = State.Unloaded;
       if (Config.chunkloaderLogLevel >= 2) {
         PersonalChunkloaderOC.info("Removed: %s", this);
       }
+      ForgeChunkManager.releaseTicket(ticket);
+      ticket = null;
+      state = State.Unloaded;
     }
   }
 
