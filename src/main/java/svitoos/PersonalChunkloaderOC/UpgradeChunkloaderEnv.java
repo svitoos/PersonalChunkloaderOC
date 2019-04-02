@@ -26,6 +26,7 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
 
   private Loader loader;
   private boolean active;
+  private final boolean isDrone;
   private boolean connected;
 
   private static Map<String, UpgradeChunkloaderEnv> activeUpgrades;
@@ -41,6 +42,7 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
 
   public UpgradeChunkloaderEnv(EnvironmentHost host) {
     this.host = host;
+    isDrone = host instanceof Drone;
     setNode(
         Network.newNode(this, Visibility.Network)
             .withComponent("chunkloader")
@@ -50,7 +52,7 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
 
   @Override
   public boolean canUpdate() {
-    return host instanceof Drone;
+    return isDrone;
   }
 
   @Override
@@ -75,7 +77,9 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
   @Override
   public void load(NBTTagCompound nbt) {
     super.load(nbt);
-    active = nbt.hasKey("active");
+    if (isDrone) {
+      active = nbt.hasKey("active");
+    }
   }
 
   @Override
@@ -86,20 +90,22 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
       if (Config.chunkloaderLogLevel >= 4) {
         PersonalChunkloaderOC.info("Connected: %s", this);
       }
-      if (active) {
-        loader = Loader.getPendingLoader(node.address());
-        if (loader != null) {
-          if (!loader.restore(getOwnerName(), host.world(), getHostCoord())) {
-            deleteLoader();
-          }
-        } else {
+      loader = Loader.getPendingLoader(node.address());
+      if (loader != null) {
+        // temp workaround: onConnect вызывается до чтения имени владельца из nbt
+        final String ownerName = isDrone && active ? loader.ownerName : getOwnerName();
+        if (!loader.restore(ownerName, host.world(), getHostCoord())) {
+          deleteLoader();
+        }
+      } else if (isDrone && active) {
+        active = false;
+        UpgradeChunkloaderEnv old = activeUpgrades.get(node.address());
+        if (old != null) {
           if (Config.chunkloaderLogLevel >= 3) {
             PersonalChunkloaderOC.info("TravelToDimension: %s", this);
           }
-          UpgradeChunkloaderEnv old = activeUpgrades.get(node.address());
-          if (old.hasLoader()) {
-            old.deleteLoader();
-          }
+          old.deleteLoader();
+          // temp workaround: для дрона onConnect вызывается до чтения имени владельца из nbt
           createLoader(old.getOwnerName());
         }
       }
@@ -123,10 +129,12 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
   @Override
   public void save(NBTTagCompound nbt) {
     super.save(nbt);
-    if (active) {
-      nbt.setBoolean("active", true);
-    } else if (nbt.hasKey("active")) {
-      nbt.removeTag("active");
+    if (isDrone) {
+      if (active) {
+        nbt.setBoolean("active", true);
+      } else if (nbt.hasKey("active")) {
+        nbt.removeTag("active");
+      }
     }
   }
 
