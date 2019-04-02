@@ -9,6 +9,7 @@ import java.util.Map;
 import li.cil.oc.api.Network;
 import li.cil.oc.api.event.RobotMoveEvent;
 import li.cil.oc.api.internal.Agent;
+import li.cil.oc.api.internal.Drone;
 import li.cil.oc.api.machine.Arguments;
 import li.cil.oc.api.machine.Callback;
 import li.cil.oc.api.machine.Context;
@@ -18,7 +19,6 @@ import li.cil.oc.api.network.Node;
 import li.cil.oc.api.network.Visibility;
 import li.cil.oc.api.prefab.ManagedEnvironment;
 
-import net.minecraft.entity.Entity;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.ChunkCoordinates;
 
@@ -42,7 +42,7 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
 
   @Override
   public boolean canUpdate() {
-    return host instanceof Entity;
+    return host instanceof Drone;
   }
 
   @Override
