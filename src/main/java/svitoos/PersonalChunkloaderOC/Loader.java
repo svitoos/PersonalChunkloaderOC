@@ -187,8 +187,7 @@ public class Loader {
 
   private void unforceChunks() {
     for (ChunkCoordIntPair chunkCoord : ticket.getChunkList()) {
-      PersonalChunkloaderOC.info("Unforce chunk %s by %s", chunkCoord, address);
-      ForgeChunkManager.unforceChunk(ticket, chunkCoord);
+      unforceChunk(chunkCoord);
     }
   }
 
