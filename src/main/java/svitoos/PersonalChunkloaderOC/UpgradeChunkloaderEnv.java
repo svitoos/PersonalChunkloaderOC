@@ -3,7 +3,6 @@ package svitoos.PersonalChunkloaderOC;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import java.util.Formatter;
 import java.util.HashMap;
-import java.util.HashSet;
 
 import java.util.Map;
 import li.cil.oc.api.Network;
@@ -27,18 +26,15 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
 
   private Loader loader;
   private boolean active;
+  private boolean connected;
 
-  private static HashSet<UpgradeChunkloaderEnv> upgrades;
   private static Map<String, UpgradeChunkloaderEnv> activeUpgrades;
 
   static void init() {
-    upgrades = new HashSet<>();
     activeUpgrades = new HashMap<>();
   }
 
   static void cleanup() {
-    upgrades.clear();
-    upgrades = null;
     activeUpgrades.clear();
     activeUpgrades = null;
   }
@@ -85,7 +81,8 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
   @Override
   public void onConnect(Node node) {
     super.onConnect(node);
-    if (node == this.node() && upgrades.add(this)) {
+    if (node == this.node() && !connected) {
+      connected = true; // workaround: предотвращаем повторный вызов onConnect для this.node()
       if (Config.chunkloaderLogLevel >= 4) {
         PersonalChunkloaderOC.info("Connected: %s", this);
       }
@@ -112,7 +109,8 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
   @Override
   public void onDisconnect(Node node) {
     super.onDisconnect(node);
-    if (node == this.node() && upgrades.remove(this)) {
+    if (node == this.node()) {
+      connected = false;
       if (Config.chunkloaderLogLevel >= 4) {
         PersonalChunkloaderOC.info("Disconnected: %s", this);
       }
