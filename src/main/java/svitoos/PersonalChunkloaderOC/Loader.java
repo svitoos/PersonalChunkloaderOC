@@ -352,7 +352,7 @@ public class Loader {
                   .stream()
                   .filter(loader -> loader.dimensionId == dimensionId)
                   .iterator())
-          .forEach(Loader::delete);
+          .forEach(loader -> loaders.remove(loader.address));
       // создание loader'ов
       for (Ticket ticket : tickets) {
         NBTTagCompound data = ticket.getModData();
