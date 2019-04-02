@@ -225,7 +225,7 @@ public class Loader {
 
   public static Loader getPendingLoader(String address) {
     Loader loader = loaders.get(address);
-    if (loader.state == State.Pending) {
+    if (loader != null && loader.state == State.Pending) {
       return loader;
     }
     return null;
