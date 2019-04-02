@@ -29,8 +29,8 @@ import net.minecraftforge.event.world.WorldEvent;
 
 public class Loader {
 
-  private static Map<String, Loader> loaders = new HashMap<>();
-  private static SetMultimap<String, Integer> unloadedDims = HashMultimap.create();
+  private static Map<String, Loader> loaders;
+  private static SetMultimap<String, Integer> unloadedDims;
 
   final String address;
   final String ownerName;
@@ -40,6 +40,18 @@ public class Loader {
   private ChunkCoordinates blockCoord;
   private ChunkCoordIntPair centerChunk;
   private State state = State.Pending;
+
+  static void init() {
+    loaders = new HashMap<>();
+    unloadedDims = HashMultimap.create();
+  }
+
+  static void cleanup() {
+    loaders.clear();
+    loaders = null;
+    unloadedDims.clear();
+    unloadedDims =null;
+  }
 
   public enum State {
     Connected,

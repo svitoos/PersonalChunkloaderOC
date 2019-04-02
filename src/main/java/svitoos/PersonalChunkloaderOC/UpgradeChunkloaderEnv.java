@@ -28,8 +28,20 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
   private Loader loader;
   private boolean active;
 
-  private static final HashSet<UpgradeChunkloaderEnv> upgrades = new HashSet<>();
-  private static final Map<String, UpgradeChunkloaderEnv> activeUpgrades = new HashMap<>();
+  private static HashSet<UpgradeChunkloaderEnv> upgrades ;
+  private static Map<String, UpgradeChunkloaderEnv> activeUpgrades;
+
+  static void init() {
+    upgrades = new HashSet<>();
+    activeUpgrades = new HashMap<>();
+  }
+
+  static void cleanup() {
+    upgrades.clear();
+    upgrades = null;
+    activeUpgrades.clear();
+    activeUpgrades = null;
+  }
 
   public UpgradeChunkloaderEnv(EnvironmentHost host) {
     this.host = host;

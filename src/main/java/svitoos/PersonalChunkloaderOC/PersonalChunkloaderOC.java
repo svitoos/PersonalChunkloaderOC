@@ -8,6 +8,8 @@ import cpw.mods.fml.common.SidedProxy;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
 import cpw.mods.fml.common.event.FMLPostInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
+import cpw.mods.fml.common.event.FMLServerAboutToStartEvent;
+import cpw.mods.fml.common.event.FMLServerStoppedEvent;
 
 @Mod(
     modid = PersonalChunkloaderOC.MOD_ID,
@@ -42,6 +44,18 @@ public class PersonalChunkloaderOC {
   @Mod.EventHandler
   public void postInit(FMLPostInitializationEvent e) {
     proxy.postInit(e);
+  }
+
+  @Mod.EventHandler
+  public void serverStart(FMLServerAboutToStartEvent event) {
+    Loader.init();
+    UpgradeChunkloaderEnv.init();
+  }
+
+  @Mod.EventHandler
+  public void serverStop(FMLServerStoppedEvent event) {
+    Loader.cleanup();
+    UpgradeChunkloaderEnv.cleanup();
   }
 
   static void info(String format, Object... data) {
