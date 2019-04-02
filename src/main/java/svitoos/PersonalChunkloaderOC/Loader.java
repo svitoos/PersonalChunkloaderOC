@@ -265,7 +265,8 @@ public class Loader {
     return loaders.get(address);
   }
 
-  public static Loader create(String address, String ownerName, World world, ChunkCoordinates blockCoord) {
+  public static Loader create(
+      String address, String ownerName, World world, ChunkCoordinates blockCoord) {
     if (loaders.containsKey(address) || !allowed(ownerName, world, blockCoord)) {
       return null;
     }
