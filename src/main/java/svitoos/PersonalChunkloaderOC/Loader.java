@@ -399,6 +399,9 @@ public class Loader {
 
     @SubscribeEvent(priority = EventPriority.HIGH) // after ForgeChunkManager
     public void onWorldLoad(WorldEvent.Load e) {
+      if (e.world.isRemote) {
+        return;
+      }
       int dimensionId = e.world.provider.dimensionId;
       // подгружаем чанки с активными loader'ами
       for (Loader loader : getLoaders()) {
@@ -413,6 +416,9 @@ public class Loader {
             EventPriority
                 .HIGH) // after ForgeChunkManager, before UpgradeChunkloaderEnv.onDisconnect
     public void onWorldUnload(WorldEvent.Unload e) {
+      if (e.world.isRemote) {
+        return;
+      }
       int dimensionId = e.world.provider.dimensionId;
       // помечаем loader'ы как выгруженные, но не удаляем их
       for (Loader loader : getLoaders()) {
@@ -427,6 +433,9 @@ public class Loader {
 
     @SubscribeEvent(priority = EventPriority.LOWEST) // after UpgradeChunkloaderEnv.onConnect
     public void onChunkLoad(ChunkEvent.Load e) {
+      if (e.world.isRemote) {
+        return;
+      }
       int dimensionId = e.getChunk().worldObj.provider.dimensionId;
       ChunkCoordIntPair chunkCoord = e.getChunk().getChunkCoordIntPair();
       // удаляем "осиротевшие" loader'ы из этого чанка (невосстановленные в методе
@@ -443,6 +452,9 @@ public class Loader {
 
     @SubscribeEvent(priority = EventPriority.HIGHEST) // before UpgradeChunkloaderEnv.onDisconnect
     public void onChunkUnload(ChunkEvent.Unload e) {
+      if (e.world.isRemote) {
+        return;
+      }
       int dimensionId = e.getChunk().worldObj.provider.dimensionId;
       ChunkCoordIntPair chunkCoord = e.getChunk().getChunkCoordIntPair();
       // меняем статус loader'ов в чанке на Pending
