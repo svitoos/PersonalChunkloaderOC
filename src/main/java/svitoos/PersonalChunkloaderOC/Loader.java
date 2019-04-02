@@ -236,8 +236,15 @@ public class Loader {
   public String toString() {
     final Formatter f = new Formatter();
     f.format(
-        "chunkloader by %s/%s at (%d, %d, %d) in dim %d",
-        address, ownerName, blockCoord.posX, blockCoord.posY, blockCoord.posZ, dimensionId);
+        "chunkloader by %s/%s at (%d, %d, %d) in dim %d | state = %s, active = %s",
+        address,
+        ownerName,
+        blockCoord.posX,
+        blockCoord.posY,
+        blockCoord.posZ,
+        dimensionId,
+        state,
+        active);
 
     return f.toString();
   }
