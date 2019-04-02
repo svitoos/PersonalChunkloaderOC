@@ -28,7 +28,7 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
   private Loader loader;
   private boolean active;
 
-  private static HashSet<UpgradeChunkloaderEnv> upgrades ;
+  private static HashSet<UpgradeChunkloaderEnv> upgrades;
   private static Map<String, UpgradeChunkloaderEnv> activeUpgrades;
 
   static void init() {

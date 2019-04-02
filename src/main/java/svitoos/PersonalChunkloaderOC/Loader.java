@@ -50,7 +50,7 @@ public class Loader {
     loaders.clear();
     loaders = null;
     unloadedDims.clear();
-    unloadedDims =null;
+    unloadedDims = null;
   }
 
   public enum State {
