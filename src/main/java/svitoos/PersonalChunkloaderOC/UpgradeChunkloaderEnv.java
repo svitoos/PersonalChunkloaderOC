@@ -74,7 +74,7 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
   public void onConnect(Node node) {
     super.onConnect(node);
     if (node == this.node() && upgrades.add(this)) {
-      if (Config.chunkloaderLogLevel >= 3) {
+      if (Config.chunkloaderLogLevel >= 4) {
         PersonalChunkloaderOC.info("Connected: %s", this);
       }
       if (active) {
@@ -84,6 +84,9 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
             deleteLoader();
           }
         } else {
+          if (Config.chunkloaderLogLevel >= 3) {
+            PersonalChunkloaderOC.info("TravelToDimension: %s", this);
+          }
           UpgradeChunkloaderEnv old = activeUpgrades.get(node.address());
           if (old.hasLoader()) {
             old.deleteLoader();
@@ -98,7 +101,7 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
   public void onDisconnect(Node node) {
     super.onDisconnect(node);
     if (node == this.node() && upgrades.remove(this)) {
-      if (Config.chunkloaderLogLevel >= 3) {
+      if (Config.chunkloaderLogLevel >= 4) {
         PersonalChunkloaderOC.info("Disconnected: %s", this);
       }
       if (hasLoader() && loader.isConnected()) {

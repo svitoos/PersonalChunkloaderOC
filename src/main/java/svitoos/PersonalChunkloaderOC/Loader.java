@@ -96,7 +96,7 @@ public class Loader {
         && allowed(ownerName, world, blockCoord)) {
       state = State.Connected;
       setCoordinates(blockCoord);
-      if (Config.chunkloaderLogLevel >= 2) {
+      if (Config.chunkloaderLogLevel >= 3) {
         PersonalChunkloaderOC.info("Restored: %s", this);
       }
       if (active) {
@@ -104,6 +104,7 @@ public class Loader {
       }
       return true;
     }
+    PersonalChunkloaderOC.warn("Invalid (restore): %s", this);
     delete();
     return false;
   }
@@ -135,6 +136,7 @@ public class Loader {
       }
       return true;
     } else {
+      PersonalChunkloaderOC.warn("Invalid (update): %s", this);
       delete();
       return false;
     }
@@ -142,6 +144,9 @@ public class Loader {
 
   public void activate() {
     if (!active) {
+      if (Config.chunkloaderLogLevel >= 3) {
+        PersonalChunkloaderOC.info("Activate: %s", this);
+      }
       active = true;
       if (state == State.Connected) {
         updateChunks(); // включаем подгрузку чанков loader'ом
@@ -153,6 +158,9 @@ public class Loader {
 
   public void deactivate() {
     if (active) {
+      if (Config.chunkloaderLogLevel >= 3) {
+        PersonalChunkloaderOC.info("Deactivate: %s", this);
+      }
       active = false;
       unforceChunks();
     }
@@ -192,18 +200,21 @@ public class Loader {
   }
 
   private void force() {
+    if (Config.chunkloaderLogLevel >= 4) {
+      PersonalChunkloaderOC.info("Load center chunk %s by %s", centerChunk, address);
+    }
     ticket.world.getChunkFromChunkCoords(centerChunk.chunkXPos, centerChunk.chunkZPos);
   }
 
   private void forceChunk(ChunkCoordIntPair chunkCoord) {
-    if (Config.chunkloaderLogLevel >= 3) {
+    if (Config.chunkloaderLogLevel >= 4) {
       PersonalChunkloaderOC.info("Force chunk %s by %s", chunkCoord, address);
     }
     ForgeChunkManager.forceChunk(ticket, chunkCoord);
   }
 
   private void unforceChunk(ChunkCoordIntPair chunkCoord) {
-    if (Config.chunkloaderLogLevel >= 3) {
+    if (Config.chunkloaderLogLevel >= 4) {
       PersonalChunkloaderOC.info("Unforce chunk %s by %s", chunkCoord, address);
     }
     ForgeChunkManager.unforceChunk(ticket, chunkCoord);
@@ -412,7 +423,7 @@ public class Loader {
         if (loader.dimensionId == dimensionId
             && chunkCoord.equals(loader.centerChunk)
             && !loader.isConnected()) {
-          PersonalChunkloaderOC.warn("Invalid: %s", loader);
+          PersonalChunkloaderOC.warn("Invalid (orphaned): %s", loader);
           loader.delete();
         }
       }
