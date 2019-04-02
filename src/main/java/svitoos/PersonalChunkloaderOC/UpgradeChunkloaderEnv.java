@@ -135,6 +135,9 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
   @Override
   public void onMessage(Message message) {
     super.onMessage(message);
+    if (Config.chunkloaderLogLevel >= 4) {
+      PersonalChunkloaderOC.info("onMessage(%s): %s", message.name(), this);
+    }
     if (message.name().equals("computer.stopped")) {
       setActive(false);
     } else if (message.name().equals("computer.started")) {

@@ -213,21 +213,21 @@ public class Loader {
 
   private void force() {
     if (Config.chunkloaderLogLevel >= 4) {
-      PersonalChunkloaderOC.info("Load center chunk %s by %s", centerChunk, address);
+      PersonalChunkloaderOC.info("Load center chunk %s : %s", centerChunk, this);
     }
     ticket.world.getChunkFromChunkCoords(centerChunk.chunkXPos, centerChunk.chunkZPos);
   }
 
   private void forceChunk(ChunkCoordIntPair chunkCoord) {
     if (Config.chunkloaderLogLevel >= 4) {
-      PersonalChunkloaderOC.info("Force chunk %s by %s", chunkCoord, address);
+      PersonalChunkloaderOC.info("Force chunk %s : %s", chunkCoord, this);
     }
     ForgeChunkManager.forceChunk(ticket, chunkCoord);
   }
 
   private void unforceChunk(ChunkCoordIntPair chunkCoord) {
     if (Config.chunkloaderLogLevel >= 4) {
-      PersonalChunkloaderOC.info("Unforce chunk %s by %s", chunkCoord, address);
+      PersonalChunkloaderOC.info("Unforce chunk %s : %s", chunkCoord, this);
     }
     ForgeChunkManager.unforceChunk(ticket, chunkCoord);
   }
@@ -402,6 +402,9 @@ public class Loader {
       if (e.world.isRemote) {
         return;
       }
+      if (Config.chunkloaderLogLevel >= 4) {
+        PersonalChunkloaderOC.info("onWorldLoad");
+      }
       int dimensionId = e.world.provider.dimensionId;
       // подгружаем чанки с активными loader'ами
       for (Loader loader : getLoaders()) {
@@ -418,6 +421,9 @@ public class Loader {
     public void onWorldUnload(WorldEvent.Unload e) {
       if (e.world.isRemote) {
         return;
+      }
+      if (Config.chunkloaderLogLevel >= 4) {
+        PersonalChunkloaderOC.info("onWorldUnload");
       }
       int dimensionId = e.world.provider.dimensionId;
       // помечаем loader'ы как выгруженные, но не удаляем их
