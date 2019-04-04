@@ -2,8 +2,8 @@ package svitoos.PersonalChunkloaderOC;
 
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import java.util.Formatter;
-import java.util.HashMap;
 
+import java.util.HashMap;
 import java.util.Map;
 import li.cil.oc.api.Network;
 import li.cil.oc.api.event.RobotMoveEvent;
@@ -18,16 +18,14 @@ import li.cil.oc.api.network.Node;
 import li.cil.oc.api.network.Visibility;
 import li.cil.oc.api.prefab.ManagedEnvironment;
 
-import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.ChunkCoordinates;
 
 public class UpgradeChunkloaderEnv extends ManagedEnvironment {
   private final EnvironmentHost host;
 
   private Loader loader;
-  private boolean active;
+  private Context hostContext;
   private final boolean isDrone;
-  private boolean connected;
 
   private static Map<String, UpgradeChunkloaderEnv> activeUpgrades;
 
@@ -66,47 +64,45 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
   @Callback(doc = "function(enable:boolean):boolean -- Enables or disables the chunkloader.")
   public Object[] setActive(Context context, Arguments arguments) {
     setActive(arguments.checkBoolean(0));
-    return new Object[] {active};
+    return new Object[] {hasLoader()};
   }
 
   @Callback(doc = "function():boolean -- Gets whether the chunkloader is currently active.")
   public Object[] isActive(Context context, Arguments arguments) {
-    return new Object[] {active};
-  }
-
-  @Override
-  public void load(NBTTagCompound nbt) {
-    super.load(nbt);
-    if (isDrone) {
-      active = nbt.hasKey("active");
-    }
+    PersonalChunkloaderOC.info("Context.isRunning: %s : %s", context.isRunning(), this);
+    return new Object[] {hasLoader()};
   }
 
   @Override
   public void onConnect(Node node) {
     super.onConnect(node);
-    if (node == this.node() && !connected) {
-      connected = true; // workaround: предотвращаем повторный вызов onConnect для this.node()
+    if (hostContext == null
+        && node.host() instanceof Context
+        && node.canBeReachedFrom(this.node())) {
+      hostContext = (Context) node.host();
       if (Config.chunkloaderLogLevel >= 4) {
         PersonalChunkloaderOC.info("Connected: %s", this);
       }
-      loader = Loader.getPendingLoader(node.address());
+      loader = Loader.getPendingLoader(this.node().address());
       if (loader != null) {
         // temp workaround: onConnect вызывается до чтения имени владельца из nbt
-        final String ownerName = isDrone && active ? loader.ownerName : getOwnerName();
-        if (!loader.restore(ownerName, host.world(), getHostCoord())) {
+        final String ownerName = isDrone ? loader.ownerName : getOwnerName();
+        try {
+          loader.restore(ownerName, host.world(), getHostCoord());
+        } catch (Loader.Error e) {
+          PersonalChunkloaderOC.warn(
+              "Restoring failed: %s : %s : %s", e.getMessage(), this, loader);
           deleteLoader();
         }
-      } else if (isDrone && active) {
-        active = false;
-        UpgradeChunkloaderEnv old = activeUpgrades.get(node.address());
-        if (old != null) {
-          if (Config.chunkloaderLogLevel >= 3) {
-            PersonalChunkloaderOC.info("TravelToDimension: %s", this);
-          }
+      } else if (hostContext.isRunning()) {
+        if (isDrone) {
+          UpgradeChunkloaderEnv old = activeUpgrades.get(this.node().address());
           old.deleteLoader();
-          // temp workaround: для дрона onConnect вызывается до чтения имени владельца из nbt
-          createLoader(old.getOwnerName());
+          // temp workaround: onConnect вызывается до чтения имени владельца из nbt
+          final String ownerName = old.getOwnerName();
+          createLoader(ownerName);
+        } else {
+          createLoader();
         }
       }
     }
@@ -115,25 +111,14 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
   @Override
   public void onDisconnect(Node node) {
     super.onDisconnect(node);
-    if (node == this.node()) {
-      connected = false;
+    if (hostContext != null
+        && (node == this.node() || node.host() instanceof Context && node.host() == hostContext)) {
+      hostContext = null;
       if (Config.chunkloaderLogLevel >= 4) {
         PersonalChunkloaderOC.info("Disconnected: %s", this);
       }
       if (hasLoader() && loader.isConnected()) {
         deleteLoader();
-      }
-    }
-  }
-
-  @Override
-  public void save(NBTTagCompound nbt) {
-    super.save(nbt);
-    if (isDrone) {
-      if (active) {
-        nbt.setBoolean("active", true);
-      } else if (nbt.hasKey("active")) {
-        nbt.removeTag("active");
       }
     }
   }
@@ -152,9 +137,9 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
   }
 
   private void setActive(boolean enable) {
-    if (enable && loader == null) {
+    if (enable && !hasLoader()) {
       createLoader();
-    } else if (!enable && loader != null) {
+    } else if (!enable && hasLoader()) {
       deleteLoader();
     }
   }
@@ -166,22 +151,23 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
 
   private void createLoader(String ownerName) {
     assert !hasLoader();
-    if (activeUpgrades.containsKey(node().address())) {
-      return;
+    try {
+      loader = Loader.create(node().address(), ownerName, host.world(), getHostCoord());
+      if (hasLoader()) {
+        activeUpgrades.put(node().address(), this);
+      }
+    } catch (Loader.Error e) {
+      if (Config.logRejectedReason) {
+        PersonalChunkloaderOC.info("Creation failed: %s : %s", e.getMessage(), this);
+      }
     }
-    loader = Loader.create(node().address(), ownerName, host.world(), getHostCoord());
-    if (hasLoader()) {
-      activeUpgrades.put(node().address(), this);
-    }
-    active = hasLoader();
   }
 
   private void deleteLoader() {
     assert hasLoader();
     loader.delete();
-    loader = null;
     activeUpgrades.remove(node().address());
-    active = false;
+    loader = null;
   }
 
   private ChunkCoordinates getHostCoord() {
@@ -202,15 +188,16 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
     final Formatter f = new Formatter();
     final String ownerName = getOwnerName();
     final Node node = this.node();
+    final boolean isRunning = hostContext != null && hostContext.isRunning();
     f.format(
-        "upgrade %s/%s at (%d, %d, %d) in dim %d %s",
+        "upgrade %s/%s at (%d, %d, %d) in dim %d | isRunning=%s",
         node != null ? this.node().address() : "?",
         ownerName != null ? ownerName : "none",
         (int) host.xPosition(),
         (int) host.yPosition(),
         (int) host.zPosition(),
         host.world().provider.dimensionId,
-        active ? "(active)" : "");
+        isRunning);
     return f.toString();
   }
 

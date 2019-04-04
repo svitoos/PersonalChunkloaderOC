@@ -23,7 +23,6 @@ import net.minecraftforge.common.ForgeChunkManager;
 import net.minecraftforge.common.ForgeChunkManager.PlayerOrderedLoadingCallback;
 import net.minecraftforge.common.ForgeChunkManager.Ticket;
 import net.minecraftforge.common.ForgeChunkManager.Type;
-import net.minecraftforge.common.util.FakePlayer;
 import net.minecraftforge.event.world.ChunkEvent;
 import net.minecraftforge.event.world.WorldEvent;
 
@@ -67,7 +66,6 @@ public class Loader {
     dimensionId = ticket.world.provider.dimensionId;
     active = (getPlayer(ownerName) != null);
     setCoordinates(blockCoord);
-    loaders.put(address, this);
   }
 
   private boolean setCoordinates(ChunkCoordinates blockCoord) {
@@ -101,24 +99,24 @@ public class Loader {
     }
   }
 
-  public boolean restore(String ownerName, World world, ChunkCoordinates blockCoord) {
+  public void restore(String ownerName, World world, ChunkCoordinates blockCoord) throws Error {
     assert state == State.Pending;
-    if (this.ownerName.equals(ownerName)
-        && ticket.world == world
-        && allowed(ownerName, world, blockCoord)) {
-      state = State.Connected;
-      setCoordinates(blockCoord);
-      if (Config.chunkloaderLogLevel >= 3) {
-        PersonalChunkloaderOC.info("Restored: %s", this);
-      }
-      if (active) {
-        updateChunks();
-      }
-      return true;
+
+    if (!this.ownerName.equals(ownerName)) {
+      throw new Error("owners mismatch");
+    } else if (ticket.world != world) {
+      throw new Error("worlds mismatch");
     }
-    PersonalChunkloaderOC.warn("Invalid (restore): %s", this);
-    delete();
-    return false;
+    allowed(ownerName, world, blockCoord);
+
+    state = State.Connected;
+    setCoordinates(blockCoord);
+    if (Config.chunkloaderLogLevel >= 3) {
+      PersonalChunkloaderOC.info("Restored: %s", this);
+    }
+    if (active) {
+      updateChunks();
+    }
   }
 
   public boolean isConnected() {
@@ -266,19 +264,23 @@ public class Loader {
   }
 
   public static Loader create(
-      String address, String ownerName, World world, ChunkCoordinates blockCoord) {
-    if (loaders.containsKey(address) || !allowed(ownerName, world, blockCoord)) {
-      return null;
+      String address, String ownerName, World world, ChunkCoordinates blockCoord) throws Error {
+    if (loaders.containsKey(address)) {
+      throw new Error("already exists");
+    } else if (ticketCountAvailableFor(ownerName) < 1) {
+      throw new Error("ticket limit");
     }
+    allowed(ownerName, world, blockCoord);
     Ticket ticket =
         ForgeChunkManager.requestPlayerTicket(
             PersonalChunkloaderOC.instance, ownerName, world, Type.NORMAL);
     if (ticket == null) {
-      return null;
+      throw new Error("rejected by ForgeChunkManager");
     }
     Loader loader = new Loader(ticket, address, blockCoord);
     ticket.getModData().setString("address", address);
     loader.state = State.Connected;
+    loaders.put(address, loader);
     if (Config.chunkloaderLogLevel >= 2) {
       PersonalChunkloaderOC.info("Added: %s", loader);
     }
@@ -288,43 +290,45 @@ public class Loader {
     return loader;
   }
 
-  public static boolean allowed(String ownerName, World world, ChunkCoordinates blockCoord) {
+  private static void allowed(
+      String ownerName, World world, ChunkCoordinates blockCoord)
+      throws Error {
     if (ownerName == null) {
-      return false;
-    }
-
-    if (Math.min(Config.maxTicketsPerPlayer, ForgeChunkManager.ticketCountAvailableFor(ownerName))
-        < 1) {
-      return false;
-    }
-
-    if (getPlayer(ownerName) instanceof FakePlayer) {
-      return false;
+      throw new Error("no owner");
     }
 
     final int dimensionId = world.provider.dimensionId;
 
     if (!allowedDim(dimensionId)) {
-      return false;
+      throw new Error("dimension is blacklisted");
     }
 
     if (!allowedCoord(dimensionId, blockCoord)) {
-      return false;
+      throw new Error("coordinates is blacklisted");
     }
+  }
 
+  private static boolean allowedDim(int dimensionId) {
     return true;
   }
 
-  public static boolean allowedDim(int dimensionId) {
+  private static boolean allowedCoord(int dimensionId, ChunkCoordinates blockCoord) {
     return true;
   }
 
-  public static boolean allowedCoord(int dimensionId, ChunkCoordinates blockCoord) {
-    return true;
+  public static int ticketCountAvailableFor(String ownerName) {
+    return Math.min(
+        Config.maxTicketsPerPlayer, ForgeChunkManager.ticketCountAvailableFor(ownerName));
   }
 
   private static EntityPlayerMP getPlayer(String playerName) {
     return MinecraftServer.getServer().getConfigurationManager().func_152612_a(playerName);
+  }
+
+  public static class Error extends Exception {
+    Error(String reason) {
+      super(reason);
+    }
   }
 
   public static class Handler implements PlayerOrderedLoadingCallback {
@@ -341,13 +345,17 @@ public class Loader {
             .forEach(
                 playerName -> {
                   List<Ticket> playerTickets = tickets.get(playerName);
-                  final int ticketCountAvailable =
-                      ForgeChunkManager.ticketCountAvailableFor(playerName);
+                  final int ticketCountAvailable = ticketCountAvailableFor(playerName);
                   int ticketCount = 0;
                   for (Ticket ticket : playerTickets) {
                     if (validateTicket(ticket)) {
                       ticketCount++;
                       if (ticketCount > ticketCountAvailable) {
+                        if (Config.chunkloaderLogLevel >= 1) {
+                          PersonalChunkloaderOC.info(
+                              "Loader %s removed due to over limit",
+                              ticket.getModData().getString("address"));
+                        }
                         break;
                       }
                       loaded.put(ticket.getPlayerName(), ticket);
@@ -360,17 +368,11 @@ public class Loader {
 
     private static boolean validateTicket(Ticket ticket) {
       NBTTagCompound data = ticket.getModData();
-      if (!(data.hasKey("x")
+      return (!(data.hasKey("x")
           && data.hasKey("y")
           && data.hasKey("z")
           && data.hasKey("address")
-          && !data.getString("address").isEmpty())) {
-        return false;
-      }
-      return allowed(
-          ticket.getPlayerName(),
-          ticket.world,
-          new ChunkCoordinates(data.getInteger("x"), data.getInteger("y"), data.getInteger("z")));
+          && !data.getString("address").isEmpty()));
     }
 
     @Override
@@ -398,8 +400,17 @@ public class Loader {
                   address,
                   new ChunkCoordinates(
                       data.getInteger("x"), data.getInteger("y"), data.getInteger("z")));
-          if (Config.chunkloaderLogLevel >= 1) {
-            PersonalChunkloaderOC.info("Loaded: %s", loader);
+          try {
+            allowed(loader.ownerName, loader.ticket.world, loader.blockCoord);
+            loaders.put(address, loader);
+            if (Config.chunkloaderLogLevel >= 1) {
+              PersonalChunkloaderOC.info("Loaded: %s", loader);
+            }
+          } catch (Error e) {
+            if (Config.chunkloaderLogLevel >= 1) {
+              PersonalChunkloaderOC.info("Loading rejected: %s : %s", e.getMessage(), loader);
+            }
+            ForgeChunkManager.releaseTicket(ticket);
           }
         }
       }

@@ -8,6 +8,7 @@ class Config {
   private static Configuration configuration;
 
   static boolean chunkloaderUpgradeRecipe = true;
+  static boolean logRejectedReason = true;
   static int chunkloaderLogLevel = 99;
   static int maxTicketsPerPlayer = 500;
   static int tickFrequency = 10;
