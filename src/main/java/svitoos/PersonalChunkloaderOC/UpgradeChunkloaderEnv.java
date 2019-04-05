@@ -83,7 +83,7 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
       if (Config.chunkloaderLogLevel >= 4) {
         PersonalChunkloaderOC.info("Connected: %s", this);
       }
-      if (hostContext.isRunning()) {
+      if (hostContext.isRunning() && !(isDrone && Config.disableDrones)) {
         loader = Loader.getPendingLoader(this.node().address());
         if (loader != null) {
           // temp workaround: onConnect вызывается до чтения имени владельца из nbt
@@ -154,6 +154,9 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
 
   private void createLoader(String ownerName) {
     assert !hasLoader();
+    if (isDrone && Config.disableDrones) {
+      return;
+    }
     try {
       loader = Loader.create(node().address(), ownerName, host.world(), getHostCoord());
       if (hasLoader()) {

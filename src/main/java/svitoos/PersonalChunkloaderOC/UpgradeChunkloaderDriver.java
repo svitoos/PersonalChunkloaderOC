@@ -26,7 +26,7 @@ public class UpgradeChunkloaderDriver extends DriverItem implements HostAware {
 
   @Override
   public boolean worksWith(ItemStack stack, Class<? extends EnvironmentHost> host) {
-    return worksWith(stack) && isRobot(host) || Drone.class.isAssignableFrom(host);
+    return worksWith(stack) && (isRobot(host) || Drone.class.isAssignableFrom(host) && !Config.disableDrones);
   }
 
   @Override
