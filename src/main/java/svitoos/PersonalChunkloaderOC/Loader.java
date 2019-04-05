@@ -290,8 +290,7 @@ public class Loader {
     return loader;
   }
 
-  private static void allowed(
-      String ownerName, World world, ChunkCoordinates blockCoord)
+  private static void allowed(String ownerName, World world, ChunkCoordinates blockCoord)
       throws Error {
     if (ownerName == null) {
       throw new Error("no owner");
