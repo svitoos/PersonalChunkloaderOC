@@ -7,12 +7,11 @@ import net.minecraftforge.common.config.Configuration;
 class Config {
   private static Configuration configuration;
 
-  static boolean chunkloaderUpgradeRecipe = true;
-  static boolean logRejectedReason = true;
-  static int chunkloaderLogLevel = 99;
-  static int maxTicketsPerPlayer = 500;
-  static int tickFrequency = 10;
-
+  static boolean chunkloaderUpgradeRecipe;
+  static boolean logRejectedReason;
+  static int chunkloaderLogLevel;
+  static int maxTicketsPerPlayer;
+  static int tickFrequency;
   static void init(File file) {
     configuration = new Configuration(file);
     configuration.load();
