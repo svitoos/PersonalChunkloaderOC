@@ -359,6 +359,8 @@ public class Loader {
                         break;
                       }
                       loaded.put(ticket.getPlayerName(), ticket);
+                    } else {
+                      PersonalChunkloaderOC.warn("Remove invalid ticket %s", ticket.getModData());
                     }
                   }
                 });
