@@ -94,15 +94,13 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
               "Restoring failed: %s : %s : %s", e.getMessage(), this, loader);
           deleteLoader();
         }
-      } else if (hostContext.isRunning()) {
-        if (isDrone) {
-          UpgradeChunkloaderEnv old = activeUpgrades.get(this.node().address());
+      } else if (isDrone && hostContext.isRunning()) {
+        UpgradeChunkloaderEnv old = activeUpgrades.get(this.node().address());
+        if (old != null) {
           old.deleteLoader();
           // temp workaround: onConnect вызывается до чтения имени владельца из nbt
           final String ownerName = old.getOwnerName();
           createLoader(ownerName);
-        } else {
-          createLoader();
         }
       }
     }
