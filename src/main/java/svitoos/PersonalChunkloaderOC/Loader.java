@@ -369,11 +369,11 @@ public class Loader {
 
     private static boolean validateTicket(Ticket ticket) {
       NBTTagCompound data = ticket.getModData();
-      return (!(data.hasKey("x")
+      return (data.hasKey("x")
           && data.hasKey("y")
           && data.hasKey("z")
           && data.hasKey("address")
-          && !data.getString("address").isEmpty()));
+          && !data.getString("address").isEmpty());
     }
 
     @Override
