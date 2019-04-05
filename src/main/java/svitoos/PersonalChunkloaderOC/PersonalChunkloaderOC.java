@@ -1,5 +1,6 @@
 package svitoos.PersonalChunkloaderOC;
 
+import cpw.mods.fml.common.event.FMLServerStartingEvent;
 import org.apache.logging.log4j.Level;
 
 import cpw.mods.fml.common.FMLLog;
@@ -44,6 +45,12 @@ public class PersonalChunkloaderOC {
   @Mod.EventHandler
   public void postInit(FMLPostInitializationEvent e) {
     proxy.postInit(e);
+  }
+
+  @Mod.EventHandler
+  public void serverLoad(FMLServerStartingEvent event) {
+    // register server commands
+    event.registerServerCommand(new Command());
   }
 
   @Mod.EventHandler
