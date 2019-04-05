@@ -83,24 +83,26 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
       if (Config.chunkloaderLogLevel >= 4) {
         PersonalChunkloaderOC.info("Connected: %s", this);
       }
-      loader = Loader.getPendingLoader(this.node().address());
-      if (loader != null) {
-        // temp workaround: onConnect вызывается до чтения имени владельца из nbt
-        final String ownerName = isDrone ? loader.ownerName : getOwnerName();
-        try {
-          loader.restore(ownerName, host.world(), getHostCoord());
-        } catch (Loader.Error e) {
-          PersonalChunkloaderOC.warn(
-              "Restoring failed: %s : %s : %s", e.getMessage(), this, loader);
-          deleteLoader();
-        }
-      } else if (isDrone && hostContext.isRunning()) {
-        UpgradeChunkloaderEnv old = activeUpgrades.get(this.node().address());
-        if (old != null) {
-          old.deleteLoader();
+      if (hostContext.isRunning()) {
+        loader = Loader.getPendingLoader(this.node().address());
+        if (loader != null) {
           // temp workaround: onConnect вызывается до чтения имени владельца из nbt
-          final String ownerName = old.getOwnerName();
-          createLoader(ownerName);
+          final String ownerName = isDrone ? loader.ownerName : getOwnerName();
+          try {
+            loader.restore(ownerName, host.world(), getHostCoord());
+          } catch (Loader.Error e) {
+            PersonalChunkloaderOC.warn(
+                "Restoring failed: %s : %s : %s", e.getMessage(), this, loader);
+            deleteLoader();
+          }
+        } else if (isDrone) {
+          UpgradeChunkloaderEnv old = activeUpgrades.get(this.node().address());
+          if (old != null) {
+            old.deleteLoader();
+            // temp workaround: onConnect вызывается до чтения имени владельца из nbt
+            final String ownerName = old.getOwnerName();
+            createLoader(ownerName);
+          }
         }
       }
     }
