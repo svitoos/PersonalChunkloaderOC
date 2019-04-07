@@ -420,10 +420,10 @@ public class Loader {
       if (e.world.isRemote) {
         return;
       }
-      if (Config.chunkloaderLogLevel >= 4) {
-        PersonalChunkloaderOC.info("onWorldLoad");
-      }
       int dimensionId = e.world.provider.dimensionId;
+      if (Config.chunkloaderLogLevel >= 1) {
+        PersonalChunkloaderOC.info("Loaded chunkloaders info for dim %s", dimensionId);
+      }
       // подгружаем чанки с активными loader'ами
       for (Loader loader : getLoaders()) {
         if (loader.dimensionId == dimensionId && loader.active) {
@@ -440,15 +440,15 @@ public class Loader {
       if (e.world.isRemote) {
         return;
       }
-      if (Config.chunkloaderLogLevel >= 4) {
-        PersonalChunkloaderOC.info("onWorldUnload");
-      }
       int dimensionId = e.world.provider.dimensionId;
+      if (Config.chunkloaderLogLevel >= 1) {
+        PersonalChunkloaderOC.info("Unloaded chunkloaders info for dim %s", dimensionId);
+      }
       // помечаем loader'ы как выгруженные, но не удаляем их
       for (Loader loader : getLoaders()) {
         if (loader.dimensionId == dimensionId) {
           if (Config.chunkloaderLogLevel >= 1) {
-            PersonalChunkloaderOC.info("Stored: %s", loader);
+            PersonalChunkloaderOC.info("Unloaded: %s", loader);
           }
           loader.unload();
         }
