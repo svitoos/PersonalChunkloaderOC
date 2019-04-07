@@ -381,9 +381,7 @@ public class Loader {
       int dimensionId = world.provider.dimensionId;
       // удаление старых записей о loader'ах в этом измерении
       ImmutableList.copyOf(
-              loaders
-                  .values()
-                  .stream()
+              loaders.values().stream()
                   .filter(loader -> loader.dimensionId == dimensionId)
                   .iterator())
           .forEach(loader -> loaders.remove(loader.address));
