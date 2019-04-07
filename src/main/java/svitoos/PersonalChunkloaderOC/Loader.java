@@ -488,7 +488,7 @@ public class Loader {
       for (Loader loader : getLoaders()) {
         if (loader.dimensionId == dimensionId
             && chunkCoord.equals(loader.centerChunk)
-            && !loader.isConnected()) {
+            && loader.isConnected()) {
           loader.state = State.Pending;
         }
       }
