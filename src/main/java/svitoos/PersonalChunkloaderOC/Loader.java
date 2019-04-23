@@ -152,7 +152,7 @@ public class Loader {
     }
   }
 
-  public void activate() {
+  private void activate() {
     if (!active) {
       if (Config.chunkloaderLogLevel >= 3) {
         PersonalChunkloaderOC.info("Activate: %s", this);
@@ -166,7 +166,7 @@ public class Loader {
     }
   }
 
-  public void deactivate() {
+  private void deactivate() {
     if (active) {
       if (Config.chunkloaderLogLevel >= 3) {
         PersonalChunkloaderOC.info("Deactivate: %s", this);
@@ -263,14 +263,19 @@ public class Loader {
     return loaders.get(address);
   }
 
+  public static void checkDuplicate(String address) throws Error {
+    if (loaders.containsKey(address)) {
+      throw new Error("duplicate");
+    }
+  }
+
   public static Loader create(
       String address, String ownerName, World world, ChunkCoordinates blockCoord) throws Error {
-    if (loaders.containsKey(address)) {
-      throw new Error("already exists");
-    } else if (ticketCountAvailableFor(ownerName) < 1) {
+    checkDuplicate(address);
+    allowed(ownerName, world, blockCoord);
+    if (ticketCountAvailableFor(ownerName) < 1) {
       throw new Error("ticket limit");
     }
-    allowed(ownerName, world, blockCoord);
     Ticket ticket =
         ForgeChunkManager.requestPlayerTicket(
             PersonalChunkloaderOC.instance, ownerName, world, Type.NORMAL);
@@ -389,28 +394,24 @@ public class Loader {
       for (Ticket ticket : tickets) {
         NBTTagCompound data = ticket.getModData();
         String address = data.getString("address");
-        if (loaders.containsKey(address)) {
-          PersonalChunkloaderOC.warn("Remove duplicate ticket %s", address);
-          ForgeChunkManager.releaseTicket(ticket);
-        } else {
-          Loader loader =
-              new Loader(
-                  ticket,
-                  address,
-                  new ChunkCoordinates(
-                      data.getInteger("x"), data.getInteger("y"), data.getInteger("z")));
-          try {
-            allowed(loader.ownerName, loader.ticket.world, loader.blockCoord);
-            loaders.put(address, loader);
-            if (Config.chunkloaderLogLevel >= 1) {
-              PersonalChunkloaderOC.info("Loaded: %s", loader);
-            }
-          } catch (Error e) {
-            if (Config.chunkloaderLogLevel >= 1) {
-              PersonalChunkloaderOC.info("Loading rejected: %s : %s", e.getMessage(), loader);
-            }
-            ForgeChunkManager.releaseTicket(ticket);
+        Loader loader =
+            new Loader(
+                ticket,
+                address,
+                new ChunkCoordinates(
+                    data.getInteger("x"), data.getInteger("y"), data.getInteger("z")));
+        try {
+          checkDuplicate(address);
+          allowed(loader.ownerName, loader.ticket.world, loader.blockCoord);
+          loaders.put(address, loader);
+          if (Config.chunkloaderLogLevel >= 1) {
+            PersonalChunkloaderOC.info("Loaded: %s", loader);
           }
+        } catch (Error e) {
+          if (Config.chunkloaderLogLevel >= 1) {
+            PersonalChunkloaderOC.info("Loading rejected: %s : %s", e.getMessage(), loader);
+          }
+          ForgeChunkManager.releaseTicket(ticket);
         }
       }
     }
