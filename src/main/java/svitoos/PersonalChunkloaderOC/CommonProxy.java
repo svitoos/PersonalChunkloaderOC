@@ -15,8 +15,9 @@ import net.minecraftforge.common.MinecraftForge;
 
 public class CommonProxy {
 
-  final private Loader.Handler chunkloaderHandler = new Loader.Handler();
-  final private UpgradeChunkloaderEnv.Handler upgradeEnvHandler = new UpgradeChunkloaderEnv.Handler();
+  private final Loader.Handler chunkloaderHandler = new Loader.Handler();
+  private final UpgradeChunkloaderEnv.Handler upgradeEnvHandler =
+      new UpgradeChunkloaderEnv.Handler();
 
   public void preInit(FMLPreInitializationEvent e) {}
 
