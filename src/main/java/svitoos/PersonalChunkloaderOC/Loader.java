@@ -297,6 +297,10 @@ public class Loader {
 
   private static void allowed(String ownerName, World world, ChunkCoordinates blockCoord)
       throws Error {
+    if (Config.disable) {
+      throw new Error("forbidden");
+    }
+
     if (ownerName == null) {
       throw new Error("no owner");
     }

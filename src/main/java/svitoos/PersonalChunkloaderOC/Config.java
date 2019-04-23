@@ -13,6 +13,7 @@ class Config {
   static int maxTicketsPerPlayer;
   static int tickFrequency;
   static boolean disableDrones;
+  static boolean disable;
   static void init(File file) {
     configuration = new Configuration(file);
     configuration.load();
@@ -25,6 +26,7 @@ class Config {
         configuration.getInt("maxTicketsPerPlayer", "general", 3, 0, Integer.MAX_VALUE, "");
     tickFrequency = configuration.getInt("tickFrequency", "general", 10, 1, Integer.MAX_VALUE, "");
     disableDrones = configuration.getBoolean("disableDrones","general", false, "");
+    disable = configuration.getBoolean("disable","general", false, "");
     configuration.save();
   }
 }
