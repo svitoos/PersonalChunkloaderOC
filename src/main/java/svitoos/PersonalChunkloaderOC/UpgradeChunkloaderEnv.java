@@ -6,6 +6,7 @@ import java.util.Formatter;
 import java.util.HashMap;
 import java.util.Map;
 import li.cil.oc.api.Network;
+import li.cil.oc.api.driver.DeviceInfo;
 import li.cil.oc.api.event.RobotMoveEvent;
 import li.cil.oc.api.internal.Agent;
 import li.cil.oc.api.internal.Drone;
@@ -20,8 +21,9 @@ import li.cil.oc.api.prefab.ManagedEnvironment;
 
 import net.minecraft.util.ChunkCoordinates;
 
-public class UpgradeChunkloaderEnv extends ManagedEnvironment {
+public class UpgradeChunkloaderEnv extends ManagedEnvironment implements DeviceInfo {
   private final EnvironmentHost host;
+  protected final Map<String, String> deviceInfo;
 
   private Loader loader;
   private Context hostContext;
@@ -40,12 +42,22 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
 
   public UpgradeChunkloaderEnv(EnvironmentHost host) {
     this.host = host;
+    deviceInfo = new HashMap<>();
+    deviceInfo.put(DeviceAttribute.Class, DeviceClass.Generic);
+    deviceInfo.put(DeviceAttribute.Description, "Personal world stabilizer");
+    deviceInfo.put(DeviceAttribute.Vendor, "Scrag Technologies");
+    deviceInfo.put(DeviceAttribute.Product, "Realizer9001-CL-P");
     isDrone = host instanceof Drone;
     setNode(
         Network.newNode(this, Visibility.Network)
             .withComponent("chunkloader")
             .withConnector()
             .create());
+  }
+
+  @Override
+  public Map<String, String> getDeviceInfo() {
+    return deviceInfo;
   }
 
   @Override
