@@ -63,7 +63,16 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
 
   @Callback(doc = "function(enable:boolean):boolean -- Enables or disables the chunkloader.")
   public Object[] setActive(Context context, Arguments arguments) {
-    setActive(arguments.checkBoolean(0));
+    boolean enable = arguments.checkBoolean(0);
+    if (enable && !hasLoader()) {
+      try {
+        createLoader();
+      } catch (Loader.Error e) {
+        return new Object[] {false, e.getMessage()};
+      }
+    } else if (!enable && hasLoader()) {
+      deleteLoader();
+    }
     return new Object[] {hasLoader()};
   }
 
@@ -101,7 +110,11 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
             old.deleteLoader();
             // temp workaround: onConnect вызывается до чтения имени владельца из nbt
             final String ownerName = old.getOwnerName();
-            createLoader(ownerName);
+            try {
+              createLoader(ownerName);
+            } catch (Loader.Error e) {
+              // ignore
+            }
           }
         }
       }
@@ -130,29 +143,29 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
       if (Config.chunkloaderLogLevel >= 4) {
         PersonalChunkloaderOC.info("%s: %s", message.name(), this);
       }
-      setActive(false);
+      if (hasLoader()) {
+        deleteLoader();
+      }
     } else if (message.name().equals("computer.started")) {
       if (Config.chunkloaderLogLevel >= 4) {
         PersonalChunkloaderOC.info("%s: %s", message.name(), this);
       }
-      setActive(true);
+      if (!hasLoader()) {
+        try {
+          createLoader();
+        } catch (Loader.Error e) {
+          // ignore
+        }
+      }
     }
   }
 
-  private void setActive(boolean enable) {
-    if (enable && !hasLoader()) {
-      createLoader();
-    } else if (!enable && hasLoader()) {
-      deleteLoader();
-    }
-  }
-
-  private void createLoader() {
+  private void createLoader() throws Loader.Error {
     assert !hasLoader();
     createLoader(getOwnerName());
   }
 
-  private void createLoader(String ownerName) {
+  private void createLoader(String ownerName) throws Loader.Error {
     assert !hasLoader();
     if (isDrone && Config.disableDrones) {
       return;
@@ -166,6 +179,7 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment {
       if (Config.logRejectedReason) {
         PersonalChunkloaderOC.info("Creation failed: %s : %s", e.getMessage(), this);
       }
+      throw e;
     }
   }
 
