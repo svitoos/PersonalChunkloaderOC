@@ -2,6 +2,7 @@ package svitoos.PersonalChunkloaderOC;
 
 import java.io.File;
 
+import java.util.Arrays;
 import net.minecraftforge.common.config.Configuration;
 
 class Config {
@@ -14,6 +15,8 @@ class Config {
   static int tickFrequency;
   static boolean disableDrones;
   static boolean disable;
+  static int[] dimensionWhitelist;
+  static int[] dimensionBlacklist;
   static void init(File file) {
     configuration = new Configuration(file);
     configuration.load();
@@ -27,6 +30,10 @@ class Config {
     tickFrequency = configuration.getInt("tickFrequency", "general", 10, 1, Integer.MAX_VALUE, "");
     disableDrones = configuration.getBoolean("disableDrones","general", false, "");
     disable = configuration.getBoolean("disable","general", false, "");
+    dimensionWhitelist = configuration.get("general", "dimensionWhitelist", new int[]{}, "").getIntList();
+    dimensionBlacklist = configuration.get("general", "dimensionWhitelist", new int[]{}, "").getIntList();
+    Arrays.sort(dimensionWhitelist);
+    Arrays.sort(dimensionBlacklist);
     configuration.save();
   }
 }

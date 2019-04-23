@@ -9,6 +9,7 @@ import com.google.common.collect.SetMultimap;
 import cpw.mods.fml.common.eventhandler.EventPriority;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.PlayerEvent;
+import java.util.Arrays;
 import java.util.Formatter;
 import java.util.HashMap;
 import java.util.List;
@@ -317,7 +318,9 @@ public class Loader {
   }
 
   private static boolean allowedDim(int dimensionId) {
-    return true;
+    return Arrays.binarySearch(Config.dimensionBlacklist, dimensionId) < 0
+        && (Config.dimensionWhitelist.length == 0
+            || Arrays.binarySearch(Config.dimensionWhitelist, dimensionId) >= 0);
   }
 
   private static boolean allowedCoord(int dimensionId, ChunkCoordinates blockCoord) {
