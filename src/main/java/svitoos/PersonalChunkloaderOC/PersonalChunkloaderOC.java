@@ -1,9 +1,9 @@
 package svitoos.PersonalChunkloaderOC;
 
-import cpw.mods.fml.common.event.FMLServerStartingEvent;
 import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.Logger;
 
-import cpw.mods.fml.common.FMLLog;
+import cpw.mods.fml.common.event.FMLServerStartingEvent;
 import cpw.mods.fml.common.Mod;
 import cpw.mods.fml.common.SidedProxy;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
@@ -24,6 +24,8 @@ public class PersonalChunkloaderOC {
 
   @Mod.Instance public static PersonalChunkloaderOC instance;
 
+  static Logger logger;
+
   @SidedProxy(
       clientSide = "svitoos.PersonalChunkloaderOC.ClientProxy",
       serverSide = "svitoos.PersonalChunkloaderOC.CommonProxy")
@@ -33,6 +35,7 @@ public class PersonalChunkloaderOC {
 
   @Mod.EventHandler
   public void preInit(FMLPreInitializationEvent e) {
+    logger = e.getModLog();
     Config.init(e.getSuggestedConfigurationFile());
     proxy.preInit(e);
   }
@@ -66,10 +69,10 @@ public class PersonalChunkloaderOC {
   }
 
   static void info(String format, Object... data) {
-    FMLLog.log(MOD_ID, Level.INFO, format, data);
+    logger.log(Level.INFO, format, data);
   }
 
   static void warn(String format, Object... data) {
-    FMLLog.log(MOD_ID, Level.WARN, format, data);
+    logger.log(Level.WARN, format, data);
   }
 }
