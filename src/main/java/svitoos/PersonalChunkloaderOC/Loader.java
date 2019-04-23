@@ -427,7 +427,7 @@ public class Loader {
       }
       // подгружаем чанки с активными loader'ами
       for (Loader loader : getLoaders()) {
-        if (loader.dimensionId == dimensionId && loader.active) {
+        if (loader.state != State.Unloaded && loader.dimensionId == dimensionId && loader.active) {
           loader.force();
         }
       }
@@ -447,7 +447,7 @@ public class Loader {
       }
       // помечаем loader'ы как выгруженные, но не удаляем их
       for (Loader loader : getLoaders()) {
-        if (loader.dimensionId == dimensionId) {
+        if (loader.state != State.Unloaded && loader.dimensionId == dimensionId) {
           if (Config.chunkloaderLogLevel >= 1) {
             PersonalChunkloaderOC.info("Unloaded: %s", loader);
           }
@@ -466,7 +466,8 @@ public class Loader {
       // удаляем "осиротевшие" loader'ы из этого чанка (невосстановленные в методе
       // UpgradeChunkloaderEnv.onConnect)
       for (Loader loader : getLoaders()) {
-        if (loader.dimensionId == dimensionId
+        if (loader.state != State.Unloaded
+            && loader.dimensionId == dimensionId
             && chunkCoord.equals(loader.centerChunk)
             && !loader.isConnected()) {
           PersonalChunkloaderOC.warn("Invalid (orphaned): %s", loader);
@@ -485,7 +486,8 @@ public class Loader {
       // меняем статус loader'ов в чанке на Pending
       // для предотвращения их удаления в методе UpgradeChunkloaderEnv.onDisconnect
       for (Loader loader : getLoaders()) {
-        if (loader.dimensionId == dimensionId
+        if (loader.state != State.Unloaded
+            && loader.dimensionId == dimensionId
             && chunkCoord.equals(loader.centerChunk)
             && loader.isConnected()) {
           loader.state = State.Pending;
@@ -498,7 +500,7 @@ public class Loader {
       String playerName = e.player.getCommandSenderName();
       // активируем все loader'ы игрока в загруженных измерениях
       for (Loader loader : getLoaders()) {
-        if (playerName.equals(loader.ownerName)) {
+        if (loader.state != State.Unloaded && playerName.equals(loader.ownerName)) {
           loader.activate();
         }
       }
@@ -516,15 +518,10 @@ public class Loader {
       String playerName = e.player.getCommandSenderName();
       // деактивируем все loader'ы игрока в загруженных измерениях
       for (Loader loader : getLoaders()) {
-        if (playerName.equals(loader.ownerName)) {
+        if (loader.state != State.Unloaded && playerName.equals(loader.ownerName)) {
           loader.deactivate();
         }
       }
-    }
-
-    private static List<Loader> getLoaders() {
-      return ImmutableList.copyOf(
-          loaders.values().stream().filter(loader -> loader.state != State.Unloaded).iterator());
     }
   }
 }
