@@ -304,11 +304,11 @@ public class Loader {
     final int dimensionId = world.provider.dimensionId;
 
     if (!allowedDim(dimensionId)) {
-      throw new Error("dimension is blacklisted");
+      throw new Error("forbidden dimension");
     }
 
     if (!allowedCoord(dimensionId, blockCoord)) {
-      throw new Error("coordinates is blacklisted");
+      throw new Error("forbidden area");
     }
   }
 
