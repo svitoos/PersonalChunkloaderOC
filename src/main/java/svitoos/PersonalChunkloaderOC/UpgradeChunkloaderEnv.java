@@ -90,7 +90,6 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment implements DeviceI
 
   @Callback(doc = "function():boolean -- Gets whether the chunkloader is currently active.")
   public Object[] isActive(Context context, Arguments arguments) {
-    PersonalChunkloaderOC.info("Context.isRunning: %s : %s", context.isRunning(), this);
     return new Object[] {hasLoader()};
   }
 
