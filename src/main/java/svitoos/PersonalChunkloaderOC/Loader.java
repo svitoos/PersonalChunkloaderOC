@@ -30,6 +30,7 @@ import net.minecraftforge.event.world.WorldEvent;
 public class Loader {
 
   private static Map<String, Loader> loaders;
+  private static SetMultimap<String, Loader> playerLoaders;
   private static SetMultimap<String, Integer> unloadedDims;
 
   final String address;
@@ -43,12 +44,15 @@ public class Loader {
 
   static void init() {
     loaders = new HashMap<>();
+    playerLoaders = HashMultimap.create();
     unloadedDims = HashMultimap.create();
   }
 
   static void cleanup() {
     loaders.clear();
     loaders = null;
+    playerLoaders.clear();
+    playerLoaders = null;
     unloadedDims.clear();
     unloadedDims = null;
   }
@@ -89,8 +93,21 @@ public class Loader {
     return true;
   }
 
-  public void delete() {
+  private void reg() {
+    loaders.put(address, this);
+    playerLoaders.put(ownerName, this);
+  }
+
+  private boolean unreg() {
     if (loaders.remove(address) != null) {
+      playerLoaders.remove(ownerName, this);
+      return true;
+    }
+    return false;
+  }
+
+  public void delete() {
+    if (unreg()) {
       if (Config.chunkloaderLogLevel >= 2) {
         PersonalChunkloaderOC.info("Removed: %s", this);
       }
@@ -274,9 +291,6 @@ public class Loader {
       String address, String ownerName, World world, ChunkCoordinates blockCoord) throws Error {
     checkDuplicate(address);
     allowed(ownerName, world, blockCoord);
-    if (ticketCountAvailableFor(ownerName) < 1) {
-      throw new Error("ticket limit");
-    }
     Ticket ticket =
         ForgeChunkManager.requestPlayerTicket(
             PersonalChunkloaderOC.instance, ownerName, world, Type.NORMAL);
@@ -286,7 +300,7 @@ public class Loader {
     Loader loader = new Loader(ticket, address, blockCoord);
     ticket.getModData().setString("address", address);
     loader.state = State.Connected;
-    loaders.put(address, loader);
+    loader.reg();
     if (Config.chunkloaderLogLevel >= 2) {
       PersonalChunkloaderOC.info("Added: %s", loader);
     }
@@ -304,6 +318,10 @@ public class Loader {
 
     if (ownerName == null) {
       throw new Error("no owner");
+    }
+
+    if (playerLoaders.get(ownerName).size() >= Config.maxTicketsPerPlayer) {
+      throw new Error("limit");
     }
 
     final int dimensionId = world.provider.dimensionId;
@@ -325,11 +343,6 @@ public class Loader {
 
   private static boolean allowedCoord(int dimensionId, ChunkCoordinates blockCoord) {
     return true;
-  }
-
-  public static int ticketCountAvailableFor(String ownerName) {
-    return Math.min(
-        Config.maxTicketsPerPlayer, ForgeChunkManager.ticketCountAvailableFor(ownerName));
   }
 
   private static EntityPlayerMP getPlayer(String playerName) {
@@ -356,7 +369,8 @@ public class Loader {
             .forEach(
                 playerName -> {
                   List<Ticket> playerTickets = tickets.get(playerName);
-                  final int ticketCountAvailable = ticketCountAvailableFor(playerName);
+                  final int ticketCountAvailable =
+                      ForgeChunkManager.ticketCountAvailableFor(playerName);
                   int ticketCount = 0;
                   for (Ticket ticket : playerTickets) {
                     if (validateTicket(ticket)) {
@@ -364,7 +378,7 @@ public class Loader {
                       if (ticketCount > ticketCountAvailable) {
                         if (Config.chunkloaderLogLevel >= 1) {
                           PersonalChunkloaderOC.info(
-                              "Loader %s removed due to over limit",
+                              "Ticket %s removed due to over limit",
                               ticket.getModData().getString("address"));
                         }
                         break;
@@ -396,7 +410,7 @@ public class Loader {
               loaders.values().stream()
                   .filter(loader -> loader.dimensionId == dimensionId)
                   .iterator())
-          .forEach(loader -> loaders.remove(loader.address));
+          .forEach(Loader::unreg);
       // создание loader'ов
       for (Ticket ticket : tickets) {
         NBTTagCompound data = ticket.getModData();
@@ -410,7 +424,7 @@ public class Loader {
         try {
           checkDuplicate(address);
           allowed(loader.ownerName, loader.ticket.world, loader.blockCoord);
-          loaders.put(address, loader);
+          loader.reg();
           if (Config.chunkloaderLogLevel >= 1) {
             PersonalChunkloaderOC.info("Loaded: %s", loader);
           }
