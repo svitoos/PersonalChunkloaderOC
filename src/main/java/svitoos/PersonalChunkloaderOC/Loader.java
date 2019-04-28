@@ -366,33 +366,32 @@ public class Loader {
 
       ListMultimap<String, Ticket> loaded = ArrayListMultimap.create();
 
-      if (allowedDim(world.provider.dimensionId)) {
-        tickets
-            .keySet()
-            .forEach(
-                playerName -> {
-                  List<Ticket> playerTickets = tickets.get(playerName);
-                  final int ticketCountAvailable =
-                      ForgeChunkManager.ticketCountAvailableFor(playerName);
-                  int ticketCount = 0;
-                  for (Ticket ticket : playerTickets) {
-                    if (validateTicket(ticket)) {
-                      ticketCount++;
-                      if (ticketCount > ticketCountAvailable) {
-                        if (Config.chunkloaderLogLevel >= 1) {
-                          PersonalChunkloaderOC.info(
-                              "Ticket %s removed due to over limit",
-                              ticket.getModData().getString("address"));
-                        }
-                        break;
+      tickets
+          .keySet()
+          .forEach(
+              playerName -> {
+                List<Ticket> playerTickets = tickets.get(playerName);
+                final int ticketCountAvailable =
+                    ForgeChunkManager.ticketCountAvailableFor(playerName);
+                int ticketCount = 0;
+                for (Ticket ticket : playerTickets) {
+                  if (validateTicket(ticket)) {
+                    ticketCount++;
+                    if (ticketCount > ticketCountAvailable) {
+                      if (Config.chunkloaderLogLevel >= 1) {
+                        PersonalChunkloaderOC.info(
+                            "Ticket %s removed due to over limit",
+                            ticket.getModData().getString("address"));
                       }
-                      loaded.put(ticket.getPlayerName(), ticket);
-                    } else {
-                      PersonalChunkloaderOC.warn("Remove invalid ticket %s", ticket.getModData());
+                      break;
                     }
+                    loaded.put(ticket.getPlayerName(), ticket);
+                  } else {
+                    PersonalChunkloaderOC.warn("Remove invalid ticket %s", ticket.getModData());
                   }
-                });
-      }
+                }
+              });
+
       return loaded;
     }
 
