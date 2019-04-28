@@ -1,7 +1,9 @@
 package svitoos.PersonalChunkloaderOC;
 
 import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.message.StringFormatterMessageFactory;
 
 import cpw.mods.fml.common.event.FMLServerStartingEvent;
 import cpw.mods.fml.common.Mod;
@@ -35,7 +37,7 @@ public class PersonalChunkloaderOC {
 
   @Mod.EventHandler
   public void preInit(FMLPreInitializationEvent e) {
-    logger = e.getModLog();
+    logger = LogManager.getLogger(MOD_ID, new StringFormatterMessageFactory());
     Config.init(e.getSuggestedConfigurationFile());
     proxy.preInit(e);
   }
