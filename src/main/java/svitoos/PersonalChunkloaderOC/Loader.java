@@ -434,7 +434,7 @@ public class Loader {
           }
         } catch (Error e) {
           if (Config.chunkloaderLogLevel >= 1) {
-            PersonalChunkloaderOC.info("Loading rejected: %s : %s", e.getMessage(), loader);
+            PersonalChunkloaderOC.info("Rejected: %s : %s", e.getMessage(), loader);
           }
           ForgeChunkManager.releaseTicket(ticket);
         }
