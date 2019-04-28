@@ -290,6 +290,7 @@ public class Loader {
   public static Loader create(
       String address, String ownerName, World world, ChunkCoordinates blockCoord) throws Error {
     checkDuplicate(address);
+    checkLimit(ownerName);
     allowed(ownerName, world, blockCoord);
     Ticket ticket =
         ForgeChunkManager.requestPlayerTicket(
@@ -310,6 +311,12 @@ public class Loader {
     return loader;
   }
 
+  private static void checkLimit(String ownerName) throws Error {
+    if (playerLoaders.get(ownerName).size() >= Config.maxTicketsPerPlayer) {
+      throw new Error("limit");
+    }
+  }
+
   private static void allowed(String ownerName, World world, ChunkCoordinates blockCoord)
       throws Error {
     if (Config.disable) {
@@ -318,10 +325,6 @@ public class Loader {
 
     if (ownerName == null) {
       throw new Error("no owner");
-    }
-
-    if (playerLoaders.get(ownerName).size() >= Config.maxTicketsPerPlayer) {
-      throw new Error("limit");
     }
 
     final int dimensionId = world.provider.dimensionId;
@@ -423,6 +426,7 @@ public class Loader {
                     data.getInteger("x"), data.getInteger("y"), data.getInteger("z")));
         try {
           checkDuplicate(address);
+          checkLimit(loader.ownerName);
           allowed(loader.ownerName, loader.ticket.world, loader.blockCoord);
           loader.reg();
           if (Config.chunkloaderLogLevel >= 1) {
