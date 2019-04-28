@@ -312,7 +312,7 @@ public class Loader {
   }
 
   private static void checkLimit(String ownerName) throws Error {
-    if (playerLoaders.get(ownerName).size() >= Config.maxLoadersPerPlayer) {
+    if (playerLoaders.get(ownerName).size() >= Config.getMaxLoadersPerPlayer(ownerName)) {
       throw new Error("limit");
     }
   }
