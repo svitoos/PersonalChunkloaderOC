@@ -31,7 +31,7 @@ class Config {
     disableDrones = configuration.getBoolean("disableDrones","general", false, "");
     disable = configuration.getBoolean("disable","general", false, "");
     dimensionWhitelist = configuration.get("general", "dimensionWhitelist", new int[]{}, "").getIntList();
-    dimensionBlacklist = configuration.get("general", "dimensionWhitelist", new int[]{}, "").getIntList();
+    dimensionBlacklist = configuration.get("general", "dimensionBlacklist", new int[]{}, "").getIntList();
     Arrays.sort(dimensionWhitelist);
     Arrays.sort(dimensionBlacklist);
     configuration.save();
