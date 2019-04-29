@@ -438,6 +438,9 @@ public class Loader {
           ForgeChunkManager.releaseTicket(ticket);
         }
       }
+      if (Config.chunkloaderLogLevel >= 1) {
+        PersonalChunkloaderOC.info("Loaded chunkloaders info for dim %s", dimensionId);
+      }
     }
 
     @SubscribeEvent(priority = EventPriority.HIGH) // after ForgeChunkManager
@@ -446,9 +449,6 @@ public class Loader {
         return;
       }
       int dimensionId = e.world.provider.dimensionId;
-      if (Config.chunkloaderLogLevel >= 1) {
-        PersonalChunkloaderOC.info("Loaded chunkloaders info for dim %s", dimensionId);
-      }
       // подгружаем чанки с активными loader'ами
       for (Loader loader : getLoaders()) {
         if (loader.state != State.Unloaded && loader.dimensionId == dimensionId && loader.active) {
@@ -466,9 +466,6 @@ public class Loader {
         return;
       }
       int dimensionId = e.world.provider.dimensionId;
-      if (Config.chunkloaderLogLevel >= 1) {
-        PersonalChunkloaderOC.info("Unloaded chunkloaders info for dim %s", dimensionId);
-      }
       // помечаем loader'ы как выгруженные, но не удаляем их
       for (Loader loader : getLoaders()) {
         if (loader.state != State.Unloaded && loader.dimensionId == dimensionId) {
@@ -477,6 +474,9 @@ public class Loader {
           }
           loader.unload();
         }
+      }
+      if (Config.chunkloaderLogLevel >= 1) {
+        PersonalChunkloaderOC.info("Unloaded chunkloaders info for dim %s", dimensionId);
       }
     }
 
