@@ -23,7 +23,7 @@ class Config {
   private static Map<String, Property> maxLoadersPerPlayerOverride;
 
   static void init(File file) {
-    configuration = new Configuration(file);
+    configuration = new Configuration(file, true);
     configuration.load();
     chunkloaderUpgradeRecipe =
         configuration.getBoolean(
@@ -42,6 +42,7 @@ class Config {
     Arrays.sort(dimensionWhitelist);
     Arrays.sort(dimensionBlacklist);
     maxLoadersPerPlayerOverride = configuration.getCategory("maxLoadersPerPlayerOverride");
+    configuration.setCategoryComment("maxLoadersPerPlayerOverride", "Personal limits. Overrides maxLoadersPerPlayer value. Entry format: I:<player's name>=<limit>");
     configuration.save();
   }
 
