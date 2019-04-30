@@ -1,5 +1,6 @@
 package svitoos.PersonalChunkloaderOC;
 
+import java.io.File;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -27,6 +28,7 @@ public class PersonalChunkloaderOC {
   @Mod.Instance public static PersonalChunkloaderOC instance;
 
   static Logger logger;
+  static File listFile;
 
   @SidedProxy(
       clientSide = "svitoos.PersonalChunkloaderOC.ClientProxy",
@@ -37,6 +39,9 @@ public class PersonalChunkloaderOC {
 
   @Mod.EventHandler
   public void preInit(FMLPreInitializationEvent e) {
+    listFile =
+        new File(
+            e.getModConfigurationDirectory().getParentFile(), "personalchunkloaderoc-list.txt");
     logger = LogManager.getLogger(MOD_ID, new StringFormatterMessageFactory());
     Config.init(e.getSuggestedConfigurationFile());
     proxy.preInit(e);
@@ -56,6 +61,7 @@ public class PersonalChunkloaderOC {
   public void serverLoad(FMLServerStartingEvent event) {
     // register server commands
     event.registerServerCommand(new Command());
+    event.registerServerCommand(new CommandDump());
   }
 
   @Mod.EventHandler
