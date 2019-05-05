@@ -203,7 +203,9 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment implements DeviceI
 
   private ChunkCoordinates getHostCoord() {
     return new ChunkCoordinates(
-        (int) host.xPosition(), (int) host.yPosition(), (int) host.zPosition());
+        (int) Math.floor(host.xPosition()),
+        (int) Math.floor(host.yPosition()),
+        (int) Math.floor(host.zPosition()));
   }
 
   private boolean hasLoader() {
@@ -220,13 +222,14 @@ public class UpgradeChunkloaderEnv extends ManagedEnvironment implements DeviceI
     final String ownerName = getOwnerName();
     final Node node = this.node();
     final boolean isRunning = hostContext != null && hostContext.isRunning();
+    final ChunkCoordinates pos = getHostCoord();
     f.format(
         "upgrade %s/%s at (%d, %d, %d) in dim %d | isRunning=%s",
         node != null ? this.node().address() : "?",
         ownerName != null ? ownerName : "none",
-        (int) host.xPosition(),
-        (int) host.yPosition(),
-        (int) host.zPosition(),
+        pos.posX,
+        pos.posY,
+        pos.posZ,
         host.world().provider.dimensionId,
         isRunning);
     return f.toString();
